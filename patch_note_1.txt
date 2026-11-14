@@ -1,0 +1,1199 @@
+# Software Product Development Brief
+# Novel Architect — An Intelligent, Guided Novel-Planning and Development System
+
+## 1. Project Overview
+
+I want to design and build an application that transforms **The Unified Novel-Writing Cookbook: An Engineered Craft Manual from Raw Idea to Finished Manuscript** and its underlying source books into an intuitive, intelligent, author-facing novel-planning system.
+
+The detailed planning requirements, tasks, and structure are documented in `readme.txt`. Treat that file as the primary requirements source.
+
+The application should help authors develop a novel before writing Chapter One by converting complicated novel-planning requirements into an organized, approachable, and intelligent workflow.
+
+I envision something similar to professional tax-preparation software: rather than presenting authors with intimidating forms, technical terminology, and hundreds of disconnected questions, the application asks understandable questions, explains why the information matters, offers contextual guidance, remembers previous answers, and intelligently determines what information is needed next.
+
+However, do not assume that a tax-filing-style questionnaire is necessarily the best interface for everything. Investigate alternative interaction models and recommend the most intuitive overall solution.
+
+**The objective is to eliminate the friction, fragmentation, repetition, and cognitive burden of novel planning while producing a comprehensive, integrated, and useful Novel Writing Plan.**
+
+The application must also accommodate authors who already have substantial material. They should be able to import scattered ideas, existing chapters, worldbuilding documents, outlines, notes, and other creative material, then have the application intelligently organize that information within the novel-planning framework.
+
+The final product should combine guided planning, intelligent document ingestion, project organization, visual story development, and professional document generation.
+
+---
+
+# 2. Your Roles
+
+Act as a combination of:
+
+### Product Manager
+Define the product, user problems, requirements, MVP, priorities, scope, and success criteria.
+
+### UX/UI Designer
+Design an intuitive author-facing experience that makes a complicated intellectual process feel manageable and organized.
+
+### Software Architect
+Design the application architecture, information model, data flow, persistence, AI integration, and technical implementation.
+
+### Novel Development Specialist
+Understand the underlying craft principles and ensure the application accurately implements the planning requirements from the Cookbook and source books.
+
+### AI Integration Specialist
+Design reliable methods for importing, extracting, classifying, cross-referencing, and organizing unstructured author material without losing its original meaning or inventing information.
+
+### Engineering Project Manager
+Break the project into manageable development phases, tasks, milestones, acceptance criteria, and testing requirements.
+
+Challenge weak assumptions. Do not simply agree with my initial interface ideas. Optimize for the actual user's experience and the quality of the final novel plan.
+
+---
+
+# 3. First Task: Inspect and Understand the Existing Materials
+
+Before designing the application, examine the available project materials.
+
+## Primary source
+
+`readme.txt`
+
+This contains the detailed novel-planning requirements and tasks that the application must implement.
+
+Read the complete file, not merely its introduction or table of contents.
+
+## Underlying craft sources
+
+Consult the three books used to develop the Unified Novel-Writing Cookbook, as identified in the project materials:
+
+- *Story Genius* — Lisa Cron
+- *Save the Cat! Writes a Novel* — Jessica Brody
+- *Structuring Your Novel Workbook* — K.M. Weiland
+
+Use the existing Cookbook and source materials to understand the actual planning requirements and their dependencies.
+
+Do not substitute generic writing knowledge for the established requirements.
+
+### Required analysis
+
+Before proposing an implementation:
+
+1. Extract every major planning category from `readme.txt`.
+2. Identify every individual planning task and question.
+3. Identify the desired output of each task.
+4. Identify prerequisites and dependencies between tasks.
+5. Identify duplicate or overlapping requirements.
+6. Distinguish essential, optional, deferrable, and genre-dependent tasks.
+7. Identify which information should be gathered from the author and which can be derived from previous answers.
+8. Identify which tasks are best handled through questions, free-form writing, structured forms, visual diagrams, or AI-assisted analysis.
+9. Map the requirements to the final Novel Writing Plan.
+
+Create a traceability matrix:
+
+| Source requirement | Planning task | User interaction | Data captured | Resulting document section | Dependencies |
+|---|---|---|---|---|---|
+
+Every significant requirement in the README should be accounted for in the application design.
+
+If `readme.txt` is unavailable, explicitly identify that blocker and request the file. Do not pretend to have inspected it or silently replace it with assumptions.
+
+---
+
+# 4. Product Vision and User Experience
+
+## The fundamental problem
+
+Novel planning is intellectually demanding because its components are interconnected.
+
+A writer may need to establish a protagonist's motivations before designing meaningful plot developments, but those motivations may change as the plot develops. Worldbuilding affects character decisions. Themes emerge from conflicts. Tone affects narrative voice and prose. Scene construction depends on larger structural decisions.
+
+Presenting all these requirements as an enormous questionnaire creates fatigue. Presenting them as a linear chat creates fragmented information, repeated questions, and difficulty understanding the overall state of the project.
+
+The application must solve these problems.
+
+## Desired author experience
+
+The author should be able to:
+
+1. Start a novel project.
+2. Import or paste existing ideas, notes, character descriptions, worldbuilding, and story fragments.
+3. Have the system organize that material into relevant planning categories.
+4. Navigate an organized development process.
+5. Answer guided questions with clear definitions and useful explanations.
+6. Receive contextual suggestions and identify gaps or contradictions.
+7. See how each answer affects other parts of the novel.
+8. Revise previous answers without losing dependent information.
+9. Review the entire story blueprint at any time.
+10. View all information and creative material entered into the application in one organized project view.
+11. Export a polished, readable PDF that represents the author's ideas and planning work.
+12. Switch between the application's default dark appearance and comfortable light appearance options.
+13. Generate a comprehensive, polished Novel Writing Plan when ready.
+
+The experience should make the author feel that the novel is gradually taking shape, rather than that they are completing administrative paperwork.
+
+## Design principles
+
+- **One source of truth:** Information should be recorded once and reused throughout the system.
+- **Progressive disclosure:** Show only the information relevant to the current task.
+- **Context before questions:** Explain unfamiliar terms and why a question matters.
+- **Smart reuse:** Automatically reference and reuse existing answers.
+- **Author control:** The author makes creative decisions; AI assists rather than takes over.
+- **Flexible sequencing:** Allow users to revisit, defer, or work ahead when dependencies permit.
+- **Visual integration:** Make relationships between story elements visible.
+- **Low cognitive overhead:** Avoid unnecessary questions, duplicate data entry, and excessive documentation.
+- **Continuous output:** The final novel plan should develop as the author works, not appear only at the very end.
+- **Preserve everything:** Do not discard raw notes, original ideas, imported material, or alternative possibilities simply because they do not yet fit the structured plan.
+- **Accessible visual design:** Offer attractive, readable, comfortable themes suitable for extended writing and planning sessions.
+- **No forced completion:** Not every planning question is necessary for every genre or novel.
+
+---
+
+# 5. Explore and Compare Interaction Models
+
+My initial preference is a tax-preparation-style guided questionnaire, but investigate alternative approaches.
+
+Evaluate the strengths, weaknesses, implementation complexity, and suitability of each.
+
+### Model A — Guided Interview / Tax Preparation Workflow
+
+The application presents one question or a small related group at a time.
+
+Each question contains:
+
+- Plain-language question.
+- Definition of relevant terminology.
+- Why the information matters.
+- Examples or explanatory notes where helpful.
+- Input field or selection controls.
+- Optional notes.
+- Save and continue controls.
+
+The next questions adapt based on previous answers.
+
+For example, choosing multiple viewpoints should trigger viewpoint-specific planning questions, while choosing a single viewpoint should hide irrelevant branches.
+
+This should feel like completing a guided professional workflow, not answering an arbitrary survey.
+
+### Model B — Project Dashboard and Task-Based Workflow
+
+Present the novel as a project with major sections, tasks, completion states, dependencies, and deliverables.
+
+The author can see:
+
+- What has been completed.
+- What remains incomplete.
+- What needs revision.
+- Which tasks depend on other decisions.
+- What can be skipped or deferred.
+- What is blocking progress.
+
+Each task opens the relevant question set, worksheet, or editor.
+
+### Model C — Visual Story Architecture / Relationship Graph
+
+Allow authors to explore the novel as an interconnected system.
+
+Examples:
+
+- Character relationship maps.
+- Character motivation and conflict connections.
+- Plot cause-and-effect graphs.
+- Theme-to-character connections.
+- Worldbuilding dependency maps.
+- Subplot integration diagrams.
+
+Clicking a node should open its underlying information and allow the author to edit it.
+
+### Model D — Visual Planning Canvas / Cards
+
+Present story components as movable cards or structured blocks.
+
+Examples:
+
+- Character cards.
+- Plot event cards.
+- Scene cards.
+- Chapter cards.
+- Worldbuilding cards.
+- Theme cards.
+
+Authors can rearrange, group, connect, expand, and edit these elements.
+
+Changes should be reflected in the structured project data and final document.
+
+### Model E — Narrative Timeline and Beat Board
+
+Provide a chronological and structural view of the novel.
+
+Authors can map:
+
+- Major plot events.
+- Story beats.
+- Character arcs.
+- Subplots.
+- Revelations.
+- Setups and payoffs.
+- Timeline events.
+- Scene and chapter sequences.
+
+This would be especially useful for identifying pacing problems, timeline inconsistencies, weak causal connections, and disconnected story threads.
+
+### Model F — AI-Assisted Writing Workshop
+
+Offer an optional workspace where the author can discuss, explore, compare, and refine ideas with an AI assistant.
+
+The assistant should understand the project's existing information and help:
+
+- Expand underdeveloped concepts.
+- Identify contradictions.
+- Suggest alternatives.
+- Challenge weak motivations.
+- Analyze structural problems.
+- Summarize decisions.
+- Convert free-form notes into structured project data.
+
+It should never silently overwrite the author's established decisions.
+
+### Comparison and recommendation
+
+Compare all six models.
+
+Recommend the strongest approach, including a possible hybrid.
+
+Do not force every model into the MVP. Identify which interface components provide the most value and which would create unnecessary development complexity.
+
+My initial hypothesis is:
+
+**Guided Interview + Project Dashboard + AI Assistance + Selective Visual Planning Tools.**
+
+However, independently evaluate whether this is the best design.
+
+---
+
+# 6. Intelligent Question System
+
+This is one of the most important parts of the product.
+
+The question system should transform complicated novel-writing requirements into manageable, understandable interactions.
+
+## Question structure
+
+Every question should have a consistent underlying schema:
+
+| Field | Description |
+|---|---|
+| Question ID | Unique identifier |
+| Section | Relevant novel-planning category |
+| Question | Plain-language question |
+| Definition | Explanation of unfamiliar concepts |
+| Purpose | Why the author needs to answer |
+| Guidance | How to approach the question |
+| Examples | Optional illustrative examples |
+| Input type | Text, rich text, selection, multiple selection, table, etc. |
+| Required status | Essential, important, optional, deferred |
+| Dependencies | Information needed before asking |
+| Conditional logic | Circumstances in which the question appears |
+| Saved answer | Author's response |
+| Derived data | Information generated from existing answers |
+| Output mapping | Where the answer appears in the final plan |
+| Validation | Conditions for a sufficiently useful answer |
+
+The actual schema may be improved, but preserve these capabilities.
+
+## How questions should work
+
+A question should not merely ask:
+
+"What is your protagonist's motivation?"
+
+It should explain the relevant concept, provide a useful way to think about it, and help the author formulate an answer.
+
+For example, the system could distinguish:
+
+- What does the character consciously want?
+- Why do they want it?
+- What deeper need or mistaken belief influences their behavior?
+- What prevents them from achieving their objective?
+- How does this motivation affect their decisions and the plot?
+
+Avoid asking these questions separately if the author has already answered them in an earlier response. Reuse established information.
+
+## Adaptive questioning
+
+Implement conditional logic.
+
+Examples:
+
+- Multiple protagonists should trigger additional character and viewpoint planning.
+- Multiple POVs should trigger viewpoint distribution and consistency planning.
+- A speculative setting should trigger appropriate world-rule questions.
+- A story with multiple timelines should trigger chronology and information-flow planning.
+- A plot with substantial political or military systems should trigger relevant institutional and operational worldbuilding questions.
+- A plot-driven narrative and a strongly character-driven narrative may require different emphasis.
+
+Do not assume all novels need the same depth of planning in every category.
+
+## Handling incomplete answers
+
+Authors must be able to select:
+
+- I know the answer.
+- I need help developing it.
+- I am undecided.
+- This does not apply to my novel.
+- I want to defer this until drafting.
+- I intentionally want this to remain unknown.
+
+Do not treat every blank as a problem.
+
+Distinguish between:
+- An unanswered author decision.
+- A deliberate narrative mystery.
+- An optional planning detail.
+- Information that can be derived.
+- Information that is genuinely required before drafting.
+
+## Smart autofill and reuse
+
+When a question is answered, inspect whether the information can satisfy or partially answer other requirements.
+
+For example, established protagonist information may populate relevant fields in the character overview, character arc, plot blueprint, and narrative consistency sections.
+
+However:
+
+- Never invent missing information.
+- Never turn a tentative idea into a confirmed decision.
+- Clearly label AI-generated suggestions.
+- Ask the author to approve substantive inferences.
+- Preserve the original source material and answer history.
+- Flag contradictions instead of arbitrarily resolving them.
+
+---
+
+# 7. Import Existing Creative Material — Intelligent Ingestion and Organization
+
+This is a core product capability, not merely a convenience feature.
+
+Many authors do not begin with a clean outline or a blank project. They already have scattered notes, partially written chapters, character profiles, worldbuilding documents, research, dialogue fragments, timelines, and ideas accumulated across different files.
+
+The application should make it easy to bring this material into the project without requiring the author to organize everything manually first.
+
+## 7.1 Import entry points
+
+Provide a clearly visible **Import Existing Material** function.
+
+Support multiple methods:
+
+- Paste text directly into the application.
+- Upload one or more files.
+- Import a collection of documents together.
+- Add individual notes or ideas manually.
+- Import an existing outline or manuscript.
+- Import existing chapters, including incomplete drafts.
+- Import character sheets, setting documents, research notes, and worldbuilding references.
+
+Evaluate suitable common formats for the MVP, such as:
+
+- TXT
+- Markdown
+- DOCX
+- PDF
+- RTF
+
+Add other formats when technically justified.
+
+For scanned PDFs or image-based documents, evaluate OCR support as a separate capability. Clearly communicate when text extraction may be incomplete.
+
+Do not claim universal file compatibility. Display supported formats and handle unsupported files gracefully.
+
+## 7.2 Import workflow
+
+Design the import process as a staged pipeline:
+
+<escape>Upload / Paste → Extract → Analyze → Classify → Map → Review → Approve → Integrate</escape>
+
+The author should be able to inspect the extracted material before it enters the structured planning system.
+
+### Step 1 — Collect
+
+Allow authors to add multiple sources in one import session.
+
+Preserve:
+- Original file.
+- Filename and file type.
+- Import date.
+- Source identity.
+- Original text or extracted content.
+
+### Step 2 — Extract
+
+Extract usable text and document structure, including where applicable:
+
+- Headings.
+- Paragraphs.
+- Lists.
+- Tables.
+- Chapter boundaries.
+- Section titles.
+- Page information.
+
+Maintain source references so imported information can be traced back to its original location.
+
+### Step 3 — Understand
+
+Use AI to identify the types of content present.
+
+Examples include:
+
+- Premise and story concepts.
+- Character identities and descriptions.
+- Character motivations and relationships.
+- Plot events and possible turning points.
+- Scene and chapter material.
+- Setting and worldbuilding information.
+- History and timelines.
+- Themes and philosophical questions.
+- Technology, science, and internal world rules.
+- Tone, narrative voice, and stylistic preferences.
+- Loose ideas, fragments, and unresolved possibilities.
+
+A partially written chapter should be analyzed differently from a worldbuilding reference or a character profile.
+
+### Step 4 — Classify and map
+
+Map extracted information to appropriate locations in the novel-planning framework.
+
+For example:
+
+| Imported material | Suggested destination |
+|---|---|
+| Character biography | Character dossier |
+| Dialogue or character notes | Character voice / relationships |
+| Chapter draft | Scene and chapter blueprint |
+| Timeline document | Chronology and continuity |
+| Political system description | Worldbuilding / institutions |
+| Technology notes | Science and technology rules |
+| Loose story ideas | Idea inventory / possible plot material |
+| Theme discussion | Thematic architecture |
+| Multiple plot fragments | Main plot / subplot candidates |
+| Prose examples | Style and tone reference |
+
+One source may contain information relevant to several sections. The system should be able to extract and map information to multiple destinations without duplicating the original source material unnecessarily.
+
+### Step 5 — Review and approve
+
+Before integrating information, show the author:
+
+- Extracted information.
+- Suggested destination.
+- Original source and location.
+- Confidence or uncertainty.
+- Whether the item duplicates existing material.
+- Whether it conflicts with an established decision.
+- Whether it is an observation, a tentative idea, or an established story fact.
+
+Allow the author to:
+
+- Accept.
+- Edit.
+- Reject.
+- Move to another section.
+- Mark as a tentative idea.
+- Keep as an unclassified note.
+- Defer the decision.
+
+Do not silently insert large quantities of AI-interpreted information into the project.
+
+### Step 6 — Integrate
+
+Once approved, populate the appropriate planning sections and update relevant project views.
+
+Preserve a link to the source material so the author can inspect where an idea originally came from.
+
+## 7.3 Handle ambiguity and contradictions intelligently
+
+Imported material may contain conflicting ideas because authors change their minds.
+
+Do not automatically treat every discrepancy as an error.
+
+Distinguish between:
+
+- Actual contradictions.
+- Different versions of the same idea.
+- An abandoned idea and a current decision.
+- Intentional mysteries.
+- Incomplete information.
+- Alternative creative directions.
+- Changes made over time.
+
+For conflicts, present the relevant passages and ask the author to decide whether to merge, replace, retain both, or mark one as obsolete.
+
+Never invent a definitive answer to resolve a conflict.
+
+## 7.4 Preserve the original material
+
+The imported source documents must remain accessible.
+
+Provide an **Original Materials Library** containing:
+
+- Uploaded files.
+- Pasted notes.
+- Extracted passages.
+- Import history.
+- Processing status.
+- Integration status.
+- Connections to the planning sections where content was used.
+
+The author should never lose an original idea simply because AI decides that it is irrelevant.
+
+## 7.5 Import efficiency
+
+Avoid requiring the author to manually inspect every extracted sentence.
+
+Provide:
+- Batch review.
+- Category-level approval.
+- Duplicate detection.
+- Confidence-based sorting.
+- Suggested bulk actions.
+- Unclassified-content queue.
+- Clear indication of uncertain or conflicting material.
+
+Allow safe, high-confidence extraction to be approved in batches, while ambiguous or consequential changes require individual review.
+
+**Key requirement:** The application must transform disorganized creative material into organized project information without losing nuance, source history, or author control.
+
+---
+
+# 8. Complete Project View and Professional PDF Export
+
+This is another major product function.
+
+Provide a dedicated **Project Overview / All My Material** page where the author can review everything they have contributed to the novel in one organized place.
+
+This page should not be limited to completed questionnaire fields.
+
+It should represent the complete body of the author's work in the application.
+
+## 8.1 Project Overview page
+
+Create a dedicated page that gives the author access to:
+
+- All answered planning questions.
+- All structured story information.
+- Character profiles.
+- Plot and scene material.
+- Worldbuilding records.
+- Themes and style specifications.
+- Imported documents and extracted content.
+- Original ideas and loose notes.
+- Tentative decisions.
+- Alternative versions.
+- Unresolved questions.
+- Deferred planning items.
+- AI suggestions that the author has saved.
+- Decision history and revisions.
+
+Organize the information according to the novel-planning framework, not merely by the chronological order in which it was entered.
+
+The author should be able to:
+- Browse by section.
+- Search across the complete project.
+- Filter by content type or status.
+- Open and edit an entry.
+- See where information originated.
+- See which other parts of the novel depend on it.
+- Identify incomplete or conflicting information.
+
+This should function as the project's **central knowledge repository and read-only overview, with direct links to editing interfaces**.
+
+## 8.2 Differentiate the types of project information
+
+The system should distinguish between:
+
+1. **Author-approved information:** Current established project decisions.
+2. **Tentative information:** Ideas under consideration.
+3. **Alternative versions:** Different possibilities the author wants to preserve.
+4. **Imported source material:** Original notes, documents, and manuscript content.
+5. **AI suggestions:** Ideas produced by AI but not yet accepted.
+6. **Deferred decisions:** Issues intentionally left for later.
+7. **Archived material:** Older ideas or decisions that are no longer active but may be useful.
+
+Do not mix all of these into one undifferentiated document.
+
+## 8.3 Professional PDF generation
+
+Provide an obvious **Export Novel Plan to PDF** function.
+
+The exported document should be a polished, readable, professionally organized representation of the author's novel-development work.
+
+It should not look like a raw database dump, a questionnaire transcript, or a collection of disconnected answers.
+
+The PDF must:
+
+- Follow the novel-planning framework and its section hierarchy.
+- Use consistent headings and typography.
+- Include a title page.
+- Include an automatically generated table of contents.
+- Use clear section and subsection numbering.
+- Use appropriate page breaks.
+- Format tables and lists cleanly.
+- Include page numbers.
+- Support long documents without broken layouts.
+- Include readable headers, footers, and document metadata where useful.
+- Use a layout suitable for both screen reading and printing.
+- Avoid splitting important tables or headings awkwardly across pages.
+- Preserve the author's original meaning and wording where appropriate.
+
+### Document content
+
+The PDF should represent the author's actual ideas and inputs, including relevant material that has not yet become a finalized decision.
+
+It should include:
+- Structured planning information.
+- Author-written explanations and notes.
+- Original imported ideas where relevant.
+- Accepted character, plot, and worldbuilding details.
+- Tentative and unresolved material, clearly labeled.
+- References to source documents where useful.
+- Relevant diagrams or visual maps if the layout supports them.
+
+Do not silently omit material merely because it does not fit a conventional template.
+
+Do not fill empty sections with invented content or generic advice.
+
+### Export options
+
+Consider offering multiple export profiles:
+
+**A. Complete Project Archive**
+- Comprehensive record of all author-entered content.
+- All relevant notes, alternatives, and unresolved items.
+- Imported-source references.
+- Decision history where appropriate.
+
+**B. Working Novel Blueprint**
+- Clean, consolidated plan organized around the final novel structure.
+- Approved decisions and relevant working notes.
+- Important unresolved items.
+- Minimal administrative information.
+
+**C. Pre-Drafting Brief**
+- Concise operational document.
+- The story foundation, tone, characters, world rules, major plot architecture, and Chapter One requirements.
+- Designed as a practical reference while writing.
+
+The author should be able to preview the export and choose what to include.
+
+Offer PDF as the primary requested format. Evaluate DOCX and Markdown export as complementary formats.
+
+### Versioning and regeneration
+
+- Allow the author to regenerate the PDF whenever project information changes.
+- Include export date and version.
+- Optionally retain previous exported versions.
+- Ensure that the PDF reflects the current saved project data.
+- Clearly distinguish the final approved plan from drafts and working archives.
+
+**The goal:** The author should be able to open one document and understand the entire novel-development project, including the substance of their own ideas, without having to revisit dozens of separate screens.
+
+---
+
+# 9. Visual Design, Themes, and Display Preferences
+
+The application should have an attractive, modern, comfortable interface suitable for long planning and writing sessions.
+
+The current application uses a dark UI appearance. **Preserve the existing dark theme as the default**, but add selectable bright, comfortable light themes.
+
+## 9.1 Theme selection
+
+Provide a clearly accessible theme switcher, ideally in the application settings or global navigation.
+
+At minimum, support:
+
+1. **Default Dark:** Preserve the current dark UI appearance.
+2. **Comfortable Light:** A bright, balanced light theme with soft backgrounds and readable text.
+3. **Optional Warm / Paper Theme:** A warmer, lower-glare appearance inspired by paper and editorial workspaces.
+
+You may recommend additional themes if they provide meaningful value without complicating the product.
+
+## 9.2 Light-theme design requirements
+
+The light UI must be easy on the eyes, not simply a black-and-white inversion of the dark theme.
+
+Consider:
+- Soft off-white or neutral backgrounds rather than glaring pure white.
+- Dark, readable text with sufficient contrast.
+- Muted, restrained accent colors.
+- Clear distinction between cards, panels, navigation, and input fields.
+- Comfortable line spacing and typography.
+- Visually calm layouts.
+- Subtle borders and shadows.
+- Clear focus and hover states.
+- Consistent treatment of input controls, dialogs, tables, and notifications.
+
+Avoid:
+- Excessively saturated colors.
+- Harsh white backgrounds.
+- Low-contrast gray text.
+- Excessive visual decoration.
+- Inconsistent colors between components.
+- Bright accents that compete with the author's content.
+
+The interface should be welcoming and visually engaging without becoming distracting.
+
+## 9.3 Consistency across the application
+
+Theme switching must apply consistently to:
+
+- Dashboard.
+- Guided questions.
+- Forms and text editors.
+- Character and worldbuilding pages.
+- Visual maps and diagrams.
+- Import interfaces.
+- Project Overview.
+- PDF preview.
+- Settings and dialogs.
+- Notifications and interactive controls.
+
+Do not leave some pages in dark mode while others use light mode.
+
+## 9.4 User preferences and accessibility
+
+- Allow users to switch themes at any time.
+- Save the chosen theme preference.
+- Retain the preference across sessions.
+- Consider following the device's system theme as an optional setting.
+- Support keyboard navigation and visible focus states.
+- Maintain suitable text contrast.
+- Ensure controls are identifiable and usable in every theme.
+- Test long-form text readability.
+- Avoid relying on color alone to communicate status.
+
+The PDF export's visual design may be independent of the application's UI theme. Offer a consistent, print-friendly document style regardless of which interface theme the author selected.
+
+---
+
+# 10. AI Capabilities and Project Intelligence
+
+AI should function as a context-aware planning assistant.
+
+It should understand the complete project, not just the current question.
+
+### Required capabilities
+
+**Idea extraction**
+
+Organize pasted notes and uploaded documents into relevant planning categories.
+
+**Information summarization**
+
+Convert long answers into concise structured summaries while retaining original text and meaning.
+
+**Gap detection**
+
+Identify missing information that may materially weaken the story.
+
+**Contradiction detection**
+
+Find conflicts between established facts, character motivations, timeline entries, world rules, and plot events.
+
+**Dependency analysis**
+
+When a decision changes, identify other sections that may need reconsideration.
+
+**Suggestion generation**
+
+Offer alternatives and explain their trade-offs without treating suggestions as decisions.
+
+**Structural review**
+
+Evaluate plot causality, character agency, motivation, scene purpose, subplot integration, pacing, and thematic connections.
+
+**Consistency checking**
+
+Compare newly entered material against the existing novel blueprint.
+
+**Document generation**
+
+Continuously generate and update the unified Novel Writing Plan.
+
+### Critical AI rules
+
+- Never overwrite author-approved information without permission.
+- Distinguish facts, tentative ideas, suggestions, and unresolved questions.
+- Preserve the author's original creative intent.
+- Explain why a contradiction or weakness matters.
+- Do not force formulaic structures onto the novel.
+- Do not generate unnecessary content just to fill blank fields.
+- Do not confuse a polished-looking plan with a structurally sound plan.
+- Do not discard original imported content after extraction.
+- Make AI-generated inferences traceable and reviewable.
+- Maintain links between extracted facts and their original source passages.
+
+---
+
+# 11. Improve Efficiency and Prevent Expensive Rework
+
+The product's central value is reducing unnecessary planning effort and avoiding preventable structural mistakes that would require substantial rewriting later.
+
+Design specific mechanisms to achieve this.
+
+### A. Progressive planning
+
+Do not force authors to plan every detail before they understand the story.
+
+Establish levels:
+- Initial foundation.
+- Core story design.
+- Detailed narrative development.
+- Pre-drafting specification.
+
+Each level should have clear completion criteria.
+
+### B. Dependency management
+
+Show which decisions affect other decisions.
+
+For example:
+
+Changing the protagonist's fundamental motivation may affect:
+- Character arc.
+- Central conflict.
+- Major plot decisions.
+- Scene objectives.
+- Ending.
+
+Notify the author about impacted areas and offer to review them.
+
+### C. Decision history
+
+Maintain:
+- Original answer.
+- Revised answer.
+- Date and reason for change.
+- Impacted sections.
+- Approval status.
+
+Allow rollback.
+
+### D. Contradiction and gap review
+
+Before finalizing the plan, run systematic consistency checks.
+
+Examples:
+- Character behavior conflicts with established motivation.
+- A character knows something they could not have discovered.
+- An event violates established world rules.
+- A subplot has no meaningful connection to the main narrative.
+- A setup has no planned payoff.
+- A plot event has no sufficient cause.
+- A chapter does not meaningfully advance the story.
+
+### E. Avoid overplanning
+
+A major risk is turning the application into an endless administrative process.
+
+Establish a minimum sufficient planning standard.
+
+Distinguish essential decisions from refinements that are better discovered through drafting.
+
+Allow the author to proceed with acknowledged uncertainty.
+
+Do not promise that good planning eliminates revision. The realistic objective is to reduce avoidable structural rework while preserving creative discovery.
+
+---
+
+# 12. Product Requirements and Software Architecture
+
+After analyzing the README and proposing the user experience, develop a proper software product specification.
+
+### Product requirements
+
+- Problem statement.
+- Target users.
+- User personas.
+- Main use cases.
+- User stories.
+- Functional requirements.
+- Non-functional requirements.
+- Product constraints.
+- MVP scope.
+- Explicit non-goals.
+
+### User experience
+
+- Information architecture.
+- Main navigation.
+- User journeys.
+- Screen inventory.
+- Question interaction patterns.
+- Dashboard design.
+- Visual planning components.
+- Import workflow.
+- Project Overview design.
+- PDF export and preview.
+- Theme selection and customization.
+- Accessibility and responsive layout.
+
+### Application architecture
+
+- Frontend.
+- Backend.
+- Data persistence.
+- AI integration.
+- Question and branching engine.
+- Document ingestion and parsing pipeline.
+- Structured information extraction.
+- Review and approval workflow.
+- Document generation.
+- PDF rendering.
+- File import/export.
+- Authentication, if required.
+- Version history.
+- Data validation.
+- Theme management and design tokens.
+
+### Data model
+
+Design a data model that supports:
+
+- Novel projects.
+- Planning sections.
+- Questions.
+- Conditional rules.
+- Answers.
+- Source notes.
+- Imported files.
+- Extracted content.
+- Content classifications.
+- Provenance and source references.
+- Characters.
+- Locations.
+- Plot events.
+- Scenes and chapters.
+- Relationships and dependencies.
+- AI suggestions.
+- Decision history.
+- Document exports.
+- User display preferences.
+
+Avoid creating an unnecessarily complex database before the actual requirements are understood.
+
+### Non-functional requirements
+
+Address:
+- Data privacy.
+- Reliability.
+- Autosave.
+- Recovery from interrupted sessions.
+- Performance.
+- Usability.
+- Accessibility.
+- Export portability.
+- AI cost management.
+- Maintainability.
+- Security.
+- File upload safety.
+- Document storage and retention.
+- Accuracy and traceability of imported content.
+
+---
+
+# 13. Define an MVP and Future Development
+
+Do not attempt to build every possible feature immediately.
+
+Identify the smallest version that delivers the central value.
+
+The MVP should ideally support:
+
+1. Creating a novel project.
+2. Importing or pasting raw ideas and notes.
+3. Uploading common document formats.
+4. Extracting and classifying imported material.
+5. Reviewing and approving proposed mappings.
+6. A guided, adaptive question workflow.
+7. Saving and revisiting answers.
+8. Reusing information across sections.
+9. Identifying missing answers and basic contradictions.
+10. Viewing project progress.
+11. Viewing all collected and structured project information in one Project Overview.
+12. Generating a unified Novel Writing Plan.
+13. Previewing and exporting a readable PDF.
+14. Switching between default dark and comfortable light themes.
+
+Visual graphs, advanced AI analysis, collaborative editing, and complex timeline visualization can be evaluated for later releases.
+
+But do not automatically exclude something from the MVP if it is essential to solving the usability problem.
+
+For each proposed feature, explain:
+- User value.
+- Complexity.
+- Dependencies.
+- Development cost.
+- Whether it belongs in the MVP or a later release.
+
+---
+
+# 14. Project Management and Implementation Roadmap
+
+Manage the development as a real software engineering project.
+
+Create phases such as:
+
+1. Requirements and source-material analysis.
+2. Product discovery and UX research.
+3. Information architecture and interaction design.
+4. Question schema and rules engine.
+5. Data model and backend.
+6. Guided workflow implementation.
+7. Import and document ingestion pipeline.
+8. AI extraction, organization, and review workflow.
+9. Project Overview and knowledge repository.
+10. Document generation and PDF export.
+11. Theme system and visual refinement.
+12. AI integration and consistency analysis.
+13. Dashboard and visual planning tools.
+14. Testing, usability evaluation, and refinement.
+15. Deployment and documentation.
+
+For each phase, provide:
+
+- Objective.
+- Deliverables.
+- Dependencies.
+- Tasks.
+- Estimated complexity.
+- Acceptance criteria.
+- Testing requirements.
+- Risks.
+- Definition of Done.
+
+Break implementation tasks into manageable units, ideally 30–120 minutes where practical.
+
+Use:
+- Prioritized backlog.
+- Milestones.
+- User stories.
+- Acceptance criteria.
+- Risk register.
+- Technical decision records.
+- Test plan.
+- Release plan.
+
+Do not give arbitrary timelines. Estimate based on the actual scope and explain major uncertainties.
+
+---
+
+# 15. Evaluate the Product Through Realistic Use Cases
+
+Design test scenarios that represent different kinds of novel projects.
+
+At minimum, evaluate:
+
+- A character-driven contemporary novel.
+- A plot-driven thriller.
+- A speculative or science-fiction novel with extensive worldbuilding.
+- A novel with multiple protagonists and viewpoints.
+- An author who begins with scattered ideas but no coherent plot.
+- An author who already has an outline and wants to validate it.
+- An author who uploads several existing chapters.
+- An author who imports a large collection of unorganized worldbuilding notes.
+- An author who imports conflicting versions of character or plot information.
+
+Test whether the system:
+- Asks relevant questions.
+- Skips irrelevant sections.
+- Reuses information appropriately.
+- Avoids repetitive questions.
+- Identifies meaningful gaps.
+- Handles uncertainty.
+- Correctly maps imported material.
+- Preserves original wording and source information.
+- Avoids false or unsupported inferences.
+- Produces a useful final planning document.
+
+Also test the export and theme capabilities:
+- Does the PDF include all selected content?
+- Is the document readable at normal screen and print sizes?
+- Are long tables and sections laid out correctly?
+- Does the PDF accurately represent the author's ideas?
+- Does the theme switch apply consistently across the application?
+- Are both dark and light modes comfortable for prolonged use?
+
+---
+
+# 16. Initial Deliverables
+
+Do not start coding immediately.
+
+First deliver:
+
+1. **README analysis:** A complete breakdown of the planning tasks and requirements.
+2. **Requirements traceability matrix:** Every source requirement mapped to application functionality and final output.
+3. **Interaction model comparison:** At least six models, their trade-offs, and your recommended design.
+4. **Product requirements document:** Scope, users, use cases, MVP, and non-goals.
+5. **User journey:** How an author moves from raw ideas to a completed Novel Writing Plan.
+6. **Information architecture:** Navigation and section hierarchy.
+7. **Question engine design:** Question schema, conditional logic, dependency handling, and information reuse.
+8. **Import system design:** Supported inputs, extraction, classification, mapping, review, approval, and provenance.
+9. **Project Overview design:** How all user-entered and imported material is organized and displayed.
+10. **PDF export specification:** Document structure, export profiles, formatting, preview, and versioning.
+11. **Theme and visual design specification:** Dark mode, comfortable light mode, optional additional themes, and accessibility.
+12. **AI architecture:** How project context, suggestions, analysis, import processing, and document generation should work.
+13. **Data model:** Core entities and relationships.
+14. **UX wireframes:** At least the main dashboard, guided question screen, import workflow, Project Overview, PDF preview, and theme controls.
+15. **Implementation roadmap:** Phases, backlog, dependencies, and acceptance criteria.
+16. **Key technical decisions:** Recommended stack and architecture, with trade-offs.
+
+After these are presented, identify the most important product-design decisions that need approval before implementation.
+
+---
+
+# 17. Product Success Criteria
+
+The product should be judged by its ability to help an author produce a better-prepared novel, not by the number of features it contains.
+
+Measure success through:
+
+- Time required to complete core planning tasks.
+- Number of redundant questions avoided.
+- Percentage of author information successfully reused.
+- Clarity of the guided workflow.
+- Ability to understand what each question means and why it matters.
+- Accuracy of imported material extraction and classification.
+- Percentage of imported information correctly mapped to its destinations.
+- Preservation of original author material.
+- Ease of reviewing and correcting AI suggestions.
+- Ability to identify missing information and structural contradictions.
+- Ease of navigating and revising the plan.
+- Completeness and readability of the generated PDF.
+- Consistency and comfort of the visual themes.
+- Reduced need for preventable major structural changes during drafting.
+- Author satisfaction and willingness to continue using the application.
+
+Avoid meaningless metrics such as counting completed fields without evaluating their usefulness.
+
+---
+
+# 18. Final Product Philosophy
+
+The application should combine:
+
+- The structure of project-management software.
+- The usability of tax-preparation software.
+- The flexibility of a visual planning workspace.
+- The contextual intelligence of an AI writing assistant.
+- The organization of a personal knowledge repository.
+- The readability of a professionally designed publishing document.
+
+But the author should never feel like they are managing a complicated software project just to write a novel.
+
+The software should absorb the organizational complexity so the author can concentrate on creative decisions.
+
+The ideal experience is:
+
+**Existing Ideas and Documents → Intelligent Import and Organization → Guided Questions → Integrated Story Architecture → Structural Review → Complete Project Overview → Professional Novel Writing Plan (PDF) → Ready to Write Chapter One.**
+
+The product should preserve everything the author creates, make it easy to see and understand the complete body of work, and provide a comfortable interface for developing it over time.
+
+**The ultimate goal is to make novel planning easier, faster, more coherent, and less wasteful—helping authors preserve their best ideas, identify structural problems early, and enter the drafting process with a clear, unified plan.**

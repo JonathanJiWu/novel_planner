@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080909">
+    <title>Novel Architect — Gather your story</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="/" aria-label="Novel Architect home">
+          <span class="brand-mark">N</span>
+          <span>Novel <strong>Architect</strong></span>
+        </a>
+        <div class="project-label">YOUR PROJECT</div>
+        <label class="project-title-label" for="project-title">Project name</label>
+        <input id="project-title" class="project-title-input" maxlength="200" value="My Novel">
+
+        <nav id="stage-nav" class="stage-nav" aria-label="Planning sections"></nav>
+        <button id="overview-button" class="nav-item utility-nav" type="button">
+          <span class="nav-number">◎</span><span>Project overview</span>
+        </button>
+        <label class="theme-picker" for="theme-select">APPEARANCE
+          <select id="theme-select">
+            <option value="dark">Default dark</option>
+            <option value="light">Comfortable light</option>
+            <option value="paper">Warm paper</option>
+          </select>
+        </label>
+
+        <div class="sidebar-bottom">
+          <div class="progress-label"><span>Blueprint progress</span><strong id="progress-value">0%</strong></div>
+          <div class="progress-track"><div id="progress-bar"></div></div>
+          <a class="export-link" href="/api/export">↓ &nbsp; Export writing plan</a>
+          <a class="export-link" href="/api/export/pdf">↓ &nbsp; Export PDF</a>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="breadcrumb">MY PROJECT <span>/</span> <b id="current-breadcrumb">IDEA INBOX</b></div>
+          <div class="topbar-actions">
+            <span class="save-state" id="save-state"><span class="save-dot"></span> Loading project…</span>
+            <button id="sign-out" class="secondary-button" type="button" hidden>Sign out</button>
+          </div>
+        </header>
+
+        <section id="auth-page" class="auth-page" hidden>
+          <div class="eyebrow"><span class="eyebrow-line"></span> PRIVATE STORY WORKSPACE</div>
+          <h1>Welcome to <em>Novel Architect.</em></h1>
+          <p class="intro-copy">Sign in to keep your projects private and available across devices.</p>
+          <form id="auth-form" class="auth-card">
+            <label for="auth-email">EMAIL</label>
+            <input id="auth-email" type="email" autocomplete="email" required>
+            <label for="auth-password">PASSWORD</label>
+            <input id="auth-password" type="password" autocomplete="current-password" minlength="8">
+            <div class="auth-actions">
+              <button id="sign-in" class="primary-button" type="submit">Sign in</button>
+              <button id="sign-up" class="secondary-button" type="button">Create account</button>
+            </div>
+            <button id="magic-link" class="text-button auth-link" type="button">Send me a magic link</button>
+            <div class="oauth-actions">
+              <button data-provider="google" class="secondary-button" type="button">Google</button>
+              <button data-provider="github" class="secondary-button" type="button">GitHub</button>
+              <button data-provider="apple" class="secondary-button" type="button">Apple</button>
+              <button data-provider="facebook" class="secondary-button" type="button">Meta</button>
+            </div>
+            <p id="auth-message" class="auth-message" role="status"></p>
+          </form>
+        </section>
+
+        <section id="idea-inbox" class="page-section active">
+          <div class="eyebrow"><span class="eyebrow-line"></span> START WITH WHAT YOU HAVE</div>
+          <h1>Every novel begins<br>with <em>something.</em></h1>
+          <p class="intro-copy">A scene you can’t forget. A character who won’t leave you alone. A question with no easy answer. Get it all down here—we’ll give it shape as you go.</p>
+
+          <div class="capture-card">
+            <label for="idea-text" class="capture-label">What’s on your mind?</label>
+            <textarea id="idea-text" rows="5" placeholder="A character, a place, a what-if, a fragment of dialogue… Start anywhere."></textarea>
+            <div class="capture-footer">
+              <label class="category-picker">FILE UNDER
+                <select id="idea-category">
+                  <option>Unsorted</option>
+                  <option>Story</option>
+                  <option>Character</option>
+                  <option>World</option>
+                  <option>Plot</option>
+                  <option>Theme</option>
+                  <option>Tone &amp; style</option>
+                  <option>Scene</option>
+                </select>
+              </label>
+                <div class="capture-actions">
+                  <button id="add-material" class="secondary-button" type="button">Import as material</button>
+                  <button id="add-idea" class="primary-button" type="button">Save this idea <span>↗</span></button>
+                </div>
+            </div>
+          </div>
+          <div class="material-import">
+            <div>
+              <span class="guide-label">BRING IN EXISTING MATERIAL</span>
+              <p>Paste or select a plain-text/Markdown file. Nothing becomes a planning decision until you review it.</p>
+            </div>
+            <label class="secondary-button file-button">Choose text file
+              <input id="material-file" type="file" accept=".txt,.md,.markdown,text/plain,text/markdown">
+            </label>
+          </div>
+
+          <div class="section-heading">
+            <div><span class="eyebrow">YOUR COLLECTED MATERIAL</span><h2>Idea shelf <span id="idea-count" class="count-pill">0</span></h2></div>
+            <p>Nothing needs to be polished yet.</p>
+          </div>
+          <div id="idea-list" class="idea-list"></div>
+          <div id="empty-ideas" class="empty-state">
+            <span class="empty-icon">✳</span>
+            <p>Your ideas will gather here.</p>
+            <span>Capture freely. You can sort, shape, and connect them later.</span>
+          </div>
+
+          <div class="continue-card">
+            <div class="continue-icon">✎</div>
+            <div><strong>Ready to give an idea a little shape?</strong><p>Move into the guided planner whenever you’re ready. You can keep collecting ideas at any time.</p></div>
+            <button class="text-button" data-open-stage="Stage A — Story Identity">Begin planning <span>→</span></button>
+          </div>
+        </section>
+
+        <section id="overview-page" class="page-section">
+          <div class="eyebrow"><span class="eyebrow-line"></span> PROJECT KNOWLEDGE REPOSITORY</div>
+          <h1>Your project, <em>together.</em></h1>
+          <p class="intro-copy">Review answers, open decisions, ideas, and original material without losing where anything came from.</p>
+          <div class="overview-toolbar">
+            <label for="overview-search">SEARCH PROJECT</label>
+            <input id="overview-search" type="search" placeholder="Search answers and material…">
+            <select id="overview-filter" aria-label="Filter project material">
+              <option value="all">Everything</option>
+              <option value="answers">Planning answers</option>
+              <option value="ideas">Ideas</option>
+              <option value="materials">Original material</option>
+              <option value="open">Open decisions</option>
+            </select>
+          </div>
+          <div id="overview-summary" class="overview-summary"></div>
+          <div id="overview-list" class="overview-list"></div>
+        </section>
+
+        <section id="question-page" class="page-section">
+          <div class="eyebrow"><span class="eyebrow-line"></span> GUIDED STORY DEVELOPMENT</div>
+          <h1 id="stage-heading">Story identity</h1>
+          <p id="stage-intro" class="intro-copy"></p>
+          <div class="stage-guide">
+            <div class="guide-grid" id="stage-guide"></div>
+            <div class="stage-standard">
+              <div><span class="guide-label">USEFUL OUTPUT</span><p id="stage-output"></p></div>
+              <div><span class="guide-label">ENOUGH TO MOVE ON WHEN…</span><p id="stage-completion"></p></div>
+            </div>
+            <details class="stage-diagnostics">
+              <summary>How to test this stage</summary>
+              <p><strong>Decision check:</strong> <span id="stage-criteria"></span></p>
+              <p><strong>Watch for:</strong> <span id="stage-watch"></span></p>
+            </details>
+          </div>
+          <div id="question-list" class="question-list"></div>
+          <div class="page-navigation">
+            <button id="previous-stage" class="secondary-button">← Previous</button>
+            <button id="next-stage" class="primary-button">Next section <span>→</span></button>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

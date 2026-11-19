@@ -514,6 +514,9 @@ function showAuthPage(show) {
     $(`#${id}`).classList.toggle("active", !show && id === "idea-inbox");
   });
   $("#sign-out").hidden = show || !authClient;
+  $("#login-button").hidden = !authClient || Boolean(authSession);
+  $("#register-button").hidden = !authClient || Boolean(authSession);
+  $("#admin-page").classList.toggle("active", false);
   if (show) $("#admin-button").hidden = true;
 }
 
@@ -579,6 +582,16 @@ async function loadAdminProjects() {
 }
 
 function setupAuthHandlers() {
+  $("#login-button").addEventListener("click", () => {
+    showAuthPage(true);
+    setAuthMessage("Enter your email and password to log in.");
+    $("#auth-email").focus();
+  });
+  $("#register-button").addEventListener("click", () => {
+    showAuthPage(true);
+    setAuthMessage("Enter an email and a password of at least 8 characters.");
+    $("#auth-email").focus();
+  });
   $("#auth-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const email = $("#auth-email").value.trim();

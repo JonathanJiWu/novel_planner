@@ -79,6 +79,7 @@ triggers a Render deployment for every push to `main` or manual workflow run.
 ### Persistent accounts and database administration
 
 - Supabase Auth provides email/password, magic-link, OAuth, and GitHub sign-in.
+- Login and Register controls appear in the top-right account area; signed-in users see Sign out.
 - `supabase_schema.sql` creates `public.projects` for per-user saved plans and `public.profiles` for user metadata.
 - Row Level Security ensures ordinary users can only read and write their own project.
 - Administrators listed in `ADMIN_EMAILS` can open **Database admin** in the application and view or delete saved projects.

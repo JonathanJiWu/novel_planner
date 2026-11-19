@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 import jwt
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 
 from config import settings
 
@@ -57,3 +57,11 @@ def require_user(authorization: str | None = Header(default=None)) -> Authentica
         raise HTTPException(status_code=401, detail="The token has no user identity.")
     email = claims.get("email")
     return AuthenticatedUser(user_id, email if isinstance(email, str) else None, token)
+
+
+def require_admin(user: AuthenticatedUser = Depends(require_user)) -> AuthenticatedUser:
+    if not settings.admin_emails or not user.email:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator access is required.")
+    if user.email.lower() not in settings.admin_emails:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator access is required.")
+    return user

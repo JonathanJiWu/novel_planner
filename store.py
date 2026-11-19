@@ -56,21 +56,50 @@ class ProjectStore:
             raise RuntimeError(f"Supabase project save failed: {response.text}")
         return clean_data
 
+    async def list_projects(self) -> list[dict[str, Any]]:
+        if not settings.supabase_service_role_key:
+            raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is required for database administration.")
+        response = await self._request(
+            "GET",
+            "/rest/v1/projects",
+            params={"select": "owner_id,title,created_at,updated_at,data", "order": "updated_at.desc"},
+            service_role=True,
+        )
+        if response.status_code not in {200, 206}:
+            raise RuntimeError(f"Supabase project administration read failed: {response.text}")
+        return response.json()
+
+    async def delete_project(self, owner_id: str) -> None:
+        if not settings.supabase_service_role_key:
+            raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is required for database administration.")
+        response = await self._request(
+            "DELETE",
+            "/rest/v1/projects",
+            params={"owner_id": f"eq.{owner_id}"},
+            headers={"Prefer": "return=minimal"},
+            service_role=True,
+        )
+        if response.status_code not in {200, 204}:
+            raise RuntimeError(f"Supabase project delete failed: {response.text}")
+
     async def _request(
         self,
         method: str,
         path: str,
         access_token: str | None = None,
+        service_role: bool = False,
         **kwargs: Any,
     ) -> httpx.Response:
         headers = kwargs.pop("headers", {})
         headers.update(
             {
-                "apikey": settings.supabase_anon_key,
+                "apikey": settings.supabase_service_role_key if service_role else settings.supabase_anon_key,
                 "Content-Type": "application/json",
             }
         )
-        if access_token:
+        if service_role:
+            headers["Authorization"] = f"Bearer {settings.supabase_service_role_key}"
+        elif access_token:
             headers["Authorization"] = f"Bearer {access_token}"
         async with httpx.AsyncClient(
             base_url=settings.supabase_url,

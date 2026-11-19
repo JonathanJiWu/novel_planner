@@ -8,6 +8,7 @@ let saveInFlight = null;
 let authClient = null;
 let authSession = null;
 let staticMode = false;
+let currentUser = null;
 
 const $ = (selector) => document.querySelector(selector);
 const nav = $("#stage-nav");
@@ -112,6 +113,8 @@ function renderNavigation() {
   });
   const overview = $("#overview-button");
   if (overview) overview.classList.toggle("active", activeStage === -2);
+  const admin = $("#admin-button");
+  if (admin) admin.classList.toggle("active", activeStage === -3);
 }
 
 function questionsForStage(stageTitle) {
@@ -299,6 +302,7 @@ function showInbox() {
   $("#idea-inbox").classList.add("active");
   $("#question-page").classList.remove("active");
   $("#overview-page").classList.remove("active");
+  $("#admin-page").classList.remove("active");
   $("#current-breadcrumb").textContent = "IDEA INBOX";
   renderNavigation();
 }
@@ -308,6 +312,7 @@ function showOverview() {
   $("#idea-inbox").classList.remove("active");
   $("#question-page").classList.remove("active");
   $("#overview-page").classList.add("active");
+  $("#admin-page").classList.remove("active");
   $("#current-breadcrumb").textContent = "PROJECT OVERVIEW";
   renderOverview();
   renderNavigation();
@@ -320,6 +325,7 @@ function showStage(index) {
   $("#idea-inbox").classList.remove("active");
   $("#question-page").classList.add("active");
   $("#overview-page").classList.remove("active");
+  $("#admin-page").classList.remove("active");
   $("#current-breadcrumb").textContent = stage.label.toUpperCase();
   $("#stage-heading").textContent = stage.label;
   $("#stage-intro").textContent = stage.intro;
@@ -508,6 +514,68 @@ function showAuthPage(show) {
     $(`#${id}`).classList.toggle("active", !show && id === "idea-inbox");
   });
   $("#sign-out").hidden = show || !authClient;
+  if (show) $("#admin-button").hidden = true;
+}
+
+async function loadCurrentUser() {
+  if (!authSession) {
+    currentUser = null;
+    $("#admin-button").hidden = true;
+    return;
+  }
+  const response = await apiFetch("/api/me");
+  if (!response.ok) throw new Error("Could not verify the current account.");
+  currentUser = await response.json();
+  $("#admin-button").hidden = !currentUser.is_admin;
+}
+
+async function showAdmin() {
+  activeStage = -3;
+  document.querySelectorAll(".page-section").forEach((section) => section.classList.remove("active"));
+  $("#admin-page").classList.add("active");
+  renderNavigation();
+  await loadAdminProjects();
+}
+
+async function loadAdminProjects() {
+  const list = $("#admin-project-list");
+  list.textContent = "Loading projects…";
+  const response = await apiFetch("/api/admin/projects");
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    list.textContent = result.detail || "Administrator access is not available.";
+    return;
+  }
+  const projects = await response.json();
+  list.replaceChildren();
+  if (!projects.length) {
+    list.textContent = "No user projects have been saved yet.";
+    return;
+  }
+  projects.forEach((project) => {
+    const card = document.createElement("article");
+    card.className = "overview-card";
+    const heading = document.createElement("h3");
+    heading.textContent = project.title || "Untitled project";
+    const meta = document.createElement("p");
+    meta.textContent = `${project.owner_id} · Updated ${project.updated_at || "unknown"}`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "secondary-button";
+    remove.textContent = "Delete project";
+    remove.addEventListener("click", async () => {
+      if (!window.confirm(`Delete the project owned by ${project.owner_id}?`)) return;
+      const deleteResponse = await apiFetch(`/api/admin/projects/${encodeURIComponent(project.owner_id)}`, { method: "DELETE" });
+      if (!deleteResponse.ok) {
+        toast("The project could not be deleted.");
+        return;
+      }
+      toast("Project deleted.");
+      await loadAdminProjects();
+    });
+    card.append(heading, meta, remove);
+    list.append(card);
+  });
 }
 
 function setupAuthHandlers() {
@@ -632,6 +700,8 @@ async function loadApplication() {
       textarea.value = "";
     });
     $("#overview-button").addEventListener("click", showOverview);
+    $("#admin-button").addEventListener("click", showAdmin);
+    $("#refresh-admin").addEventListener("click", loadAdminProjects);
     $("#theme-select").addEventListener("change", (event) => {
       state.theme = event.target.value;
       applyTheme();
@@ -770,7 +840,10 @@ async function initialize() {
         authSession = session;
         if (session) {
           showAuthPage(false);
-          if (!hadUser) loadApplication();
+          if (!hadUser) {
+            loadApplication();
+            loadCurrentUser().catch((error) => console.error(error));
+          }
         } else {
           showAuthPage(true);
         }
@@ -779,6 +852,7 @@ async function initialize() {
         showAuthPage(true);
         return;
       }
+      await loadCurrentUser();
     }
     await loadApplication();
   } catch (error) {

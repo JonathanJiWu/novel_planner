@@ -22,6 +22,9 @@
         <button id="overview-button" class="nav-item utility-nav" type="button">
           <span class="nav-number">◎</span><span>Project overview</span>
         </button>
+        <button id="admin-button" class="nav-item utility-nav" type="button" hidden>
+          <span class="nav-number">◆</span><span>Database admin</span>
+        </button>
         <label class="theme-picker" for="theme-select">APPEARANCE
           <select id="theme-select">
             <option value="dark">Default dark</option>
@@ -143,6 +146,16 @@
           </div>
           <div id="overview-summary" class="overview-summary"></div>
           <div id="overview-list" class="overview-list"></div>
+        </section>
+
+        <section id="admin-page" class="page-section">
+          <div class="eyebrow"><span class="eyebrow-line"></span> DATABASE ADMINISTRATION</div>
+          <h1>Project <em>directory.</em></h1>
+          <p class="intro-copy">Review and remove stored user projects. This is a privileged view for configured administrators only.</p>
+          <div class="admin-toolbar">
+            <button id="refresh-admin" class="secondary-button" type="button">Refresh projects</button>
+          </div>
+          <div id="admin-project-list" class="overview-list"></div>
         </section>
 
         <section id="question-page" class="page-section">

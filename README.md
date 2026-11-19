@@ -60,6 +60,7 @@ For projects that need sign-in and access across devices, Novel Architect includ
 2. Run [`supabase_schema.sql`](supabase_schema.sql) in the Supabase SQL editor.
 3. Configure Supabase Auth providers and redirect URLs for the deployed website.
 4. Use a real SMTP provider for verification, password reset, and magic-link emails.
+5. In GitHub OAuth provider settings, enable GitHub sign-in and add the deployed website origin.
 
 ### Render setup
 
@@ -68,6 +69,20 @@ For projects that need sign-in and access across devices, Novel Architect includ
 3. Set the environment values described in [`.env.example`](.env.example).
 4. Set `AUTH_REQUIRED=true`.
 5. Set `ALLOWED_ORIGINS` to the live website origin.
+6. Set `SUPABASE_SERVICE_ROLE_KEY` only on the server.
+7. Set `ADMIN_EMAILS` to a comma-separated allowlist of administrator emails.
+8. In GitHub, add `RENDER_DEPLOY_HOOK_URL` as an Actions secret.
+
+After setup, [`.github/workflows/deploy-render.yml`](.github/workflows/deploy-render.yml)
+triggers a Render deployment for every push to `main` or manual workflow run.
+
+### Persistent accounts and database administration
+
+- Supabase Auth provides email/password, magic-link, OAuth, and GitHub sign-in.
+- `supabase_schema.sql` creates `public.projects` for per-user saved plans and `public.profiles` for user metadata.
+- Row Level Security ensures ordinary users can only read and write their own project.
+- Administrators listed in `ADMIN_EMAILS` can open **Database admin** in the application and view or delete saved projects.
+- Use the Supabase Dashboard's **Table Editor**, **Authentication**, and **Database** sections for direct administration and backups.
 
 Never place service-role or SMTP credentials in the browser or commit secrets to the repository.
 

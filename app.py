@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from auth import AuthenticatedUser, require_user
+from auth import AuthenticatedUser, require_admin, require_user
 from config import settings
 from novel_architect import NovelProject, build_planning_stages
 from store import ProjectStore
@@ -26,7 +26,7 @@ if settings.allowed_origins:
         CORSMiddleware,
         allow_origins=list(settings.allowed_origins),
         allow_credentials=True,
-        allow_methods=["GET", "PUT"],
+        allow_methods=["GET", "PUT", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
     )
 
@@ -42,7 +42,41 @@ async def public_config() -> dict[str, str | bool]:
         "supabase_configured": settings.configured,
         "supabase_url": settings.supabase_url if settings.configured else "",
         "supabase_anon_key": settings.supabase_anon_key if settings.configured else "",
+        "auth_required": settings.auth_required,
     }
+
+
+@app.get("/api/me")
+async def current_user(user: AuthenticatedUser = Depends(require_user)) -> dict[str, Any]:
+    return {
+        "user_id": user.user_id,
+        "email": user.email,
+        "is_admin": bool(
+            user.email
+            and settings.admin_emails
+            and user.email.lower() in settings.admin_emails
+        ),
+    }
+
+
+@app.get("/api/admin/projects")
+async def admin_projects(_admin: AuthenticatedUser = Depends(require_admin)) -> list[dict[str, Any]]:
+    try:
+        return await store.list_projects()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.delete("/api/admin/projects/{owner_id}")
+async def admin_delete_project(
+    owner_id: str,
+    _admin: AuthenticatedUser = Depends(require_admin),
+) -> dict[str, bool]:
+    try:
+        await store.delete_project(owner_id)
+        return {"deleted": True}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/api/project")

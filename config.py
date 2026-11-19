@@ -8,7 +8,13 @@ from dataclasses import dataclass
 class Settings:
     supabase_url: str = os.getenv("SUPABASE_URL", "").rstrip("/")
     supabase_anon_key: str = os.getenv("SUPABASE_ANON_KEY", "")
+    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     jwt_issuer: str = os.getenv("SUPABASE_JWT_ISSUER", "")
+    admin_emails: tuple[str, ...] = tuple(
+        email.strip().lower()
+        for email in os.getenv("ADMIN_EMAILS", "").split(",")
+        if email.strip()
+    )
     allowed_origins: tuple[str, ...] = tuple(
         origin.strip()
         for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")

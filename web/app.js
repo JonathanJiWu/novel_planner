@@ -13,6 +13,7 @@ let authRedirectUrl = "";
 let oauthProviders = ["google", "github", "apple", "facebook"];
 let authMode = "supabase";
 let builtinToken = "";
+let staticAuthUser = null;
 
 const $ = (selector) => document.querySelector(selector);
 const nav = $("#stage-nav");
@@ -48,7 +49,11 @@ async function saveProject() {
     if (!projectDirty) return true;
     projectDirty = false;
     state.saved_at = new Date().toISOString();
-    localStorage.setItem("novel-architect-project", JSON.stringify(state));
+    if (staticAuthUser) {
+      await saveStaticProject(state);
+    } else {
+      localStorage.setItem("novel-architect-project", JSON.stringify(state));
+    }
     showStatus("All changes saved locally");
     renderProgress();
     return true;
@@ -518,10 +523,137 @@ function showAuthPage(show) {
     $(`#${id}`).classList.toggle("active", !show && id === "idea-inbox");
   });
   $("#sign-out").hidden = show || !authClient;
-  $("#login-button").hidden = !authClient || Boolean(authSession);
-  $("#register-button").hidden = !authClient || Boolean(authSession);
+  const accountControlsAvailable = Boolean(authClient) || authMode === "indexeddb" || authMode === "builtin";
+  $("#login-button").hidden = !accountControlsAvailable || Boolean(authSession);
+  $("#register-button").hidden = !accountControlsAvailable || Boolean(authSession);
   $("#admin-page").classList.toggle("active", false);
   if (show) $("#admin-button").hidden = true;
+}
+
+async function initializeStaticApplication() {
+  window.location.reload();
+}
+
+function openStaticAuthDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("novel-architect-auth", 1);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains("users")) {
+        database.createObjectStore("users", { keyPath: "email" });
+      }
+      if (!database.objectStoreNames.contains("projects")) {
+        database.createObjectStore("projects", { keyPath: "ownerId" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function staticDatabaseRequest(database, storeName, mode, operation) {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(storeName, mode);
+    const store = transaction.objectStore(storeName);
+    const request = operation(store);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function bytesToBase64(bytes) {
+  return btoa(String.fromCharCode(...new Uint8Array(bytes)));
+}
+
+function base64ToBytes(value) {
+  const binary = atob(value);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+async function hashStaticPassword(password, salt) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: 150000,
+      hash: "SHA-256",
+    },
+    key,
+    256,
+  );
+  return bytesToBase64(bits);
+}
+
+async function staticRegister(email, password) {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    throw new Error("Enter a valid email address.");
+  }
+  if (password.length < 8 || password.length > 200) {
+    throw new Error("Password must be between 8 and 200 characters.");
+  }
+  const database = await openStaticAuthDatabase();
+  const existing = await staticDatabaseRequest(database, "users", "readonly", (store) => store.get(normalized));
+  if (existing) throw new Error("An account with this email already exists.");
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const passwordHash = await hashStaticPassword(password, salt);
+  const user = {
+    email: normalized,
+    id: crypto.randomUUID(),
+    salt: bytesToBase64(salt),
+    passwordHash,
+    createdAt: new Date().toISOString(),
+  };
+  await staticDatabaseRequest(database, "users", "readwrite", (store) => store.put(user));
+  database.close();
+  return user;
+}
+
+async function staticLogin(email, password) {
+  const normalized = email.trim().toLowerCase();
+  const database = await openStaticAuthDatabase();
+  const user = await staticDatabaseRequest(database, "users", "readonly", (store) => store.get(normalized));
+  if (!user) throw new Error("Invalid email or password.");
+  const candidate = await hashStaticPassword(password, base64ToBytes(user.salt));
+  if (candidate !== user.passwordHash) throw new Error("Invalid email or password.");
+  database.close();
+  return user;
+}
+
+async function loadStaticAuthSession() {
+  const email = localStorage.getItem("novel-architect-auth-email");
+  if (!email) return null;
+  const database = await openStaticAuthDatabase();
+  const user = await staticDatabaseRequest(database, "users", "readonly", (store) => store.get(email));
+  database.close();
+  return user || null;
+}
+
+async function saveStaticProject(project) {
+  if (!staticAuthUser) return;
+  const database = await openStaticAuthDatabase();
+  await staticDatabaseRequest(database, "projects", "readwrite", (store) => store.put({
+    ownerId: staticAuthUser.id,
+    email: staticAuthUser.email,
+    data: project,
+    updatedAt: new Date().toISOString(),
+  }));
+  database.close();
+}
+
+async function loadStaticProject(ownerId) {
+  const database = await openStaticAuthDatabase();
+  const record = await staticDatabaseRequest(database, "projects", "readonly", (store) => store.get(ownerId));
+  database.close();
+  return record ? record.data : null;
 }
 
 async function loadCurrentUser() {
@@ -600,6 +732,20 @@ function setupAuthHandlers() {
     event.preventDefault();
     const email = $("#auth-email").value.trim();
     const password = $("#auth-password").value;
+    if (authMode === "indexeddb") {
+      setAuthMessage("Signing in…");
+      try {
+        const user = await staticLogin(email, password);
+        staticAuthUser = user;
+        localStorage.setItem("novel-architect-auth-email", user.email);
+        authSession = { access_token: user.id, user: { id: user.id, email: user.email } };
+        showAuthPage(false);
+        await initializeStaticApplication();
+      } catch (error) {
+        setAuthMessage(error.message || "Could not sign in.", true);
+      }
+      return;
+    }
     if (authMode === "builtin") {
       setAuthMessage("Signing in…");
       try {
@@ -640,6 +786,21 @@ function setupAuthHandlers() {
   $("#sign-up").addEventListener("click", async () => {
     const email = $("#auth-email").value.trim();
     const password = $("#auth-password").value;
+    if (authMode === "indexeddb") {
+      setAuthMessage("Creating your account…");
+      try {
+        const user = await staticRegister(email, password);
+        staticAuthUser = user;
+        localStorage.setItem("novel-architect-auth-email", user.email);
+        authSession = { access_token: user.id, user: { id: user.id, email: user.email } };
+        showAuthPage(false);
+        await initializeStaticApplication();
+        toast("Account created and signed in.");
+      } catch (error) {
+        setAuthMessage(error.message || "Could not create the account.", true);
+      }
+      return;
+    }
     if (authMode === "builtin") {
       setAuthMessage("Creating your account…");
       try {
@@ -713,6 +874,14 @@ function setupAuthHandlers() {
     });
   });
   $("#sign-out").addEventListener("click", async () => {
+    if (authMode === "indexeddb") {
+      staticAuthUser = null;
+      authSession = null;
+      localStorage.removeItem("novel-architect-auth-email");
+      showAuthPage(true);
+      setAuthMessage("Signed out.");
+      return;
+    }
     if (authMode === "builtin") {
       builtinToken = "";
       authSession = null;
@@ -859,14 +1028,25 @@ async function initialize() {
       : { supabase_configured: false };
     if (!configResponse.ok) {
       staticMode = true;
-      const savedProject = localStorage.getItem("novel-architect-project");
-      if (savedProject) {
-        try {
-          Object.assign(state, JSON.parse(savedProject));
-        } catch (error) {
-          console.warn("Ignoring invalid local project data.", error);
-        }
+      authMode = "indexeddb";
+      $("#magic-link").hidden = true;
+      document.querySelector(".oauth-actions").hidden = true;
+      staticAuthUser = await loadStaticAuthSession();
+      if (!staticAuthUser) {
+        authSession = null;
+        $("#login-button").hidden = false;
+        $("#register-button").hidden = false;
+        $("#sign-out").hidden = true;
+        showAuthPage(true);
+        setAuthMessage("Create an account or log in to save your project.");
+        return;
       }
+      authSession = { access_token: staticAuthUser.id, user: { id: staticAuthUser.id, email: staticAuthUser.email } };
+      $("#login-button").hidden = true;
+      $("#register-button").hidden = true;
+      $("#sign-out").hidden = false;
+      const savedProject = await loadStaticProject(staticAuthUser.id);
+      if (savedProject) Object.assign(state, savedProject);
       const [questionResponse, stageResponse] = await Promise.all([
         fetch("./questions.json"),
         fetch("./stages.json"),

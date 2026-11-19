@@ -74,6 +74,19 @@ def test_auth_frontend_contains_password_and_all_supported_providers():
     assert "detectSessionInUrl: true" in javascript
 
 
+def test_static_github_pages_auth_fallback_is_complete():
+    root = Path(__file__).resolve().parents[1]
+    javascript = (root / "web" / "app.js").read_text(encoding="utf-8")
+
+    assert 'authMode = "indexeddb"' in javascript
+    assert "openStaticAuthDatabase" in javascript
+    assert "staticRegister" in javascript
+    assert "staticLogin" in javascript
+    assert "saveStaticProject" in javascript
+    assert "PBKDF2" in javascript
+    assert "indexedDB" in javascript
+
+
 def test_builtin_auth_register_login_and_project_persistence(tmp_path):
     store = AuthStore(tmp_path / "auth.db")
 

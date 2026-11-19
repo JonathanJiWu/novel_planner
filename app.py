@@ -43,6 +43,8 @@ async def public_config() -> dict[str, str | bool]:
         "supabase_url": settings.supabase_url if settings.configured else "",
         "supabase_anon_key": settings.supabase_anon_key if settings.configured else "",
         "auth_required": settings.auth_required,
+        "public_app_url": settings.public_app_url,
+        "oauth_providers": ",".join(settings.oauth_providers),
     }
 
 

@@ -61,6 +61,9 @@ For projects that need sign-in and access across devices, Novel Architect includ
 3. Configure Supabase Auth providers and redirect URLs for the deployed website.
 4. Use a real SMTP provider for verification, password reset, and magic-link emails.
 5. In GitHub OAuth provider settings, enable GitHub sign-in and add the deployed website origin.
+6. In Supabase **Authentication > Providers**, enable Google, GitHub, Apple, and Facebook (for Meta).
+7. Add `https://<project-ref>.supabase.co/auth/v1/callback` as the callback URL in each provider.
+8. Set each provider's allowed redirect URL to `PUBLIC_APP_URL`, and add that exact origin under Supabase **Authentication > URL Configuration**.
 
 ### Render setup
 

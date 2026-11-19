@@ -9,6 +9,8 @@ let authClient = null;
 let authSession = null;
 let staticMode = false;
 let currentUser = null;
+let authRedirectUrl = "";
+let oauthProviders = ["google", "github", "apple", "facebook"];
 
 const $ = (selector) => document.querySelector(selector);
 const nav = $("#stage-nav");
@@ -596,20 +598,40 @@ function setupAuthHandlers() {
     event.preventDefault();
     const email = $("#auth-email").value.trim();
     const password = $("#auth-password").value;
+    if (!authClient) {
+      setAuthMessage("Authentication is not configured on this deployment.", true);
+      return;
+    }
+    if (!email || password.length < 8) {
+      setAuthMessage("Enter an email and a password of at least 8 characters.", true);
+      return;
+    }
     setAuthMessage("Signing in…");
-    const { error } = await authClient.auth.signInWithPassword({ email, password });
-    if (error) setAuthMessage(error.message, true);
+    try {
+      const { error } = await authClient.auth.signInWithPassword({ email, password });
+      if (error) setAuthMessage(error.message, true);
+    } catch (error) {
+      setAuthMessage(error.message || "Could not sign in.", true);
+    }
   });
   $("#sign-up").addEventListener("click", async () => {
     const email = $("#auth-email").value.trim();
     const password = $("#auth-password").value;
+    if (!authClient) {
+      setAuthMessage("Authentication is not configured on this deployment.", true);
+      return;
+    }
     if (!email || password.length < 8) {
       setAuthMessage("Enter an email and a password of at least 8 characters.", true);
       return;
     }
     setAuthMessage("Creating your account…");
-    const { error } = await authClient.auth.signUp({ email, password });
-    setAuthMessage(error ? error.message : "Check your email to confirm your account.");
+    try {
+      const { error } = await authClient.auth.signUp({ email, password });
+      setAuthMessage(error ? error.message : "Account created. Check your email to confirm it.");
+    } catch (error) {
+      setAuthMessage(error.message || "Could not create the account.", true);
+    }
   });
   $("#magic-link").addEventListener("click", async () => {
     const email = $("#auth-email").value.trim();
@@ -617,19 +639,32 @@ function setupAuthHandlers() {
       setAuthMessage("Enter your email first.", true);
       return;
     }
-    const { error } = await authClient.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
-    });
-    setAuthMessage(error ? error.message : "Magic link sent. Check your email.");
+    try {
+      const { error } = await authClient.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: authRedirectUrl },
+      });
+      setAuthMessage(error ? error.message : "Magic link sent. Check your email.");
+    } catch (error) {
+      setAuthMessage(error.message || "Could not send the magic link.", true);
+    }
   });
   document.querySelectorAll("[data-provider]").forEach((button) => {
     button.addEventListener("click", async () => {
-      const { error } = await authClient.auth.signInWithOAuth({
-        provider: button.dataset.provider,
-        options: { redirectTo: window.location.origin },
-      });
-      if (error) setAuthMessage(error.message, true);
+      if (!authClient) {
+        setAuthMessage("Authentication is not configured on this deployment.", true);
+        return;
+      }
+      setAuthMessage(`Opening ${button.textContent.trim()} sign-in…`);
+      try {
+        const { error } = await authClient.auth.signInWithOAuth({
+          provider: button.dataset.provider,
+          options: { redirectTo: authRedirectUrl, skipBrowserRedirect: false },
+        });
+        if (error) setAuthMessage(error.message, true);
+      } catch (error) {
+        setAuthMessage(error.message || `${button.textContent.trim()} sign-in could not start.`, true);
+      }
     });
   });
   $("#sign-out").addEventListener("click", async () => {
@@ -844,8 +879,24 @@ async function initialize() {
       showStatus("Saved locally");
       return;
     }
+    authRedirectUrl = config.public_app_url
+      ? config.public_app_url
+      : `${window.location.origin}${window.location.pathname}`;
+    oauthProviders = (config.oauth_providers || "google,github,apple,facebook")
+      .split(",")
+      .map((provider) => provider.trim())
+      .filter(Boolean);
+    document.querySelectorAll("[data-provider]").forEach((button) => {
+      button.hidden = !oauthProviders.includes(button.dataset.provider);
+    });
     if (config.supabase_configured && window.supabase) {
-      authClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
+      authClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
+      });
       const { data } = await authClient.auth.getSession();
       authSession = data.session;
       authClient.auth.onAuthStateChange((_event, session) => {

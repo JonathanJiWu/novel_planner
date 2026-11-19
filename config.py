@@ -10,6 +10,12 @@ class Settings:
     supabase_anon_key: str = os.getenv("SUPABASE_ANON_KEY", "")
     supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     jwt_issuer: str = os.getenv("SUPABASE_JWT_ISSUER", "")
+    public_app_url: str = os.getenv("PUBLIC_APP_URL", "").rstrip("/")
+    oauth_providers: tuple[str, ...] = tuple(
+        provider.strip().lower()
+        for provider in os.getenv("OAUTH_PROVIDERS", "google,github,apple,facebook").split(",")
+        if provider.strip()
+    )
     admin_emails: tuple[str, ...] = tuple(
         email.strip().lower()
         for email in os.getenv("ADMIN_EMAILS", "").split(",")

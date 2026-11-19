@@ -35,7 +35,9 @@ Every stage includes a purpose, exercise, useful output, completion standard, de
 
 ## Try the live website
 
-Novel Architect can be published as a GitHub Pages website. The public demo runs in the browser and saves your project locally on the device you are using.
+**Live website: [https://jonathanjiwu.github.io/novel_planner/](https://jonathanjiwu.github.io/novel_planner/)**
+
+The public GitHub Pages demo runs in the browser and saves your project locally on the device you are using.
 
 > Local browser storage is convenient for a personal demo, but it is not a replacement for account-based cloud backup.
 

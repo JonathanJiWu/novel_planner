@@ -7,6 +7,7 @@ let projectDirty = false;
 let saveInFlight = null;
 let authClient = null;
 let authSession = null;
+let staticMode = false;
 
 const $ = (selector) => document.querySelector(selector);
 const nav = $("#stage-nav");
@@ -38,6 +39,15 @@ function toast(message) {
 
 async function saveProject() {
   clearTimeout(saveTimer);
+  if (staticMode) {
+    if (!projectDirty) return true;
+    projectDirty = false;
+    state.saved_at = new Date().toISOString();
+    localStorage.setItem("novel-architect-project", JSON.stringify(state));
+    showStatus("All changes saved locally");
+    renderProgress();
+    return true;
+  }
   if (saveInFlight) {
     await saveInFlight;
     return !projectDirty;
@@ -548,6 +558,35 @@ function setupAuthHandlers() {
 }
 
 async function downloadExport(url) {
+  if (staticMode) {
+    if (url.endsWith("/pdf")) {
+      window.print();
+      return;
+    }
+    const sections = [];
+    sections.push(`# ${state.title || "My Novel"}`);
+    sections.push("");
+    for (const idea of state.ideas || []) {
+      sections.push(`## Idea — ${idea.category}`, "", idea.text, "");
+    }
+    for (const material of state.materials || []) {
+      sections.push(`## Material — ${material.category}`, "", `Source: ${material.source}`, "", material.text, "");
+    }
+    for (const [questionId, answer] of Object.entries(state.answers || {})) {
+      const question = (window.questionBank || []).find((item) => item.question_id === questionId);
+      if (!question || !answer.trim()) continue;
+      const decision = state.question_states[questionId] || {};
+      sections.push(`## ${question.prompt}`, "", answer.trim(), "", `Planning level: ${decision.planning_level || question.planning_level}`, `Certainty: ${decision.certainty || "needs_work"}`, "");
+    }
+    const blob = new Blob([sections.join("\n")], { type: "text/markdown;charset=utf-8" });
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = "novel-writing-plan.md";
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+    return;
+  }
   const response = await apiFetch(url);
   if (!response.ok) {
     toast("The export could not be generated.");
@@ -647,6 +686,81 @@ async function initialize() {
     const config = configResponse.ok
       ? await configResponse.json()
       : { supabase_configured: false };
+    if (!configResponse.ok) {
+      staticMode = true;
+      const savedProject = localStorage.getItem("novel-architect-project");
+      if (savedProject) {
+        try {
+          Object.assign(state, JSON.parse(savedProject));
+        } catch (error) {
+          console.warn("Ignoring invalid local project data.", error);
+        }
+      }
+      const [questionResponse, stageResponse] = await Promise.all([
+        fetch("./questions.json"),
+        fetch("./stages.json"),
+      ]);
+      if (!questionResponse.ok || !stageResponse.ok) {
+        throw new Error("Static application data could not be loaded.");
+      }
+      window.questionBank = await questionResponse.json();
+      stages = await stageResponse.json();
+      state.materials = state.materials || [];
+      applyTheme();
+      $("#project-title").value = state.title;
+      $("#project-title").addEventListener("input", () => {
+        state.title = $("#project-title").value;
+        scheduleSave();
+      });
+      $("#add-idea").addEventListener("click", addIdea);
+      $("#add-material").addEventListener("click", () => {
+        const text = $("#idea-text").value.trim();
+        if (!text) {
+          $("#idea-text").focus();
+          toast("Paste some material before importing it.");
+          return;
+        }
+        addImportedMaterial(text, "Pasted material");
+        $("#idea-text").value = "";
+      });
+      $("#overview-button").addEventListener("click", showOverview);
+      $("#theme-select").addEventListener("change", (event) => {
+        state.theme = event.target.value;
+        applyTheme();
+        scheduleSave();
+      });
+      $("#overview-search").addEventListener("input", renderOverview);
+      $("#overview-filter").addEventListener("change", renderOverview);
+      $("#material-file").addEventListener("change", async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        try {
+          addImportedMaterial(await file.text(), file.name);
+        } catch (error) {
+          toast("That file could not be read.");
+          console.error(error);
+        } finally {
+          event.target.value = "";
+        }
+      });
+      $("#idea-text").addEventListener("keydown", (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") addIdea();
+      });
+      $("#previous-stage").addEventListener("click", () => showStage(Math.max(0, activeStage - 1)));
+      $("#next-stage").addEventListener("click", () => activeStage === stages.length - 1 ? showInbox() : showStage(activeStage + 1));
+      document.querySelectorAll("[data-open-stage]").forEach((button) => {
+        button.addEventListener("click", () => showStage(stages.findIndex((stage) => stage.title === button.dataset.openStage)));
+      });
+      document.querySelectorAll(".export-link").forEach((exportLink) => exportLink.addEventListener("click", async (event) => {
+        event.preventDefault();
+        if (await saveProject()) await downloadExport(event.currentTarget.pathname);
+      }));
+      renderIdeas();
+      renderProgress();
+      showInbox();
+      showStatus("Saved locally");
+      return;
+    }
     if (config.supabase_configured && window.supabase) {
       authClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
       const { data } = await authClient.auth.getSession();

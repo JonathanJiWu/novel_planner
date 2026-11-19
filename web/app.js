@@ -11,6 +11,8 @@ let staticMode = false;
 let currentUser = null;
 let authRedirectUrl = "";
 let oauthProviders = ["google", "github", "apple", "facebook"];
+let authMode = "supabase";
+let builtinToken = "";
 
 const $ = (selector) => document.querySelector(selector);
 const nav = $("#stage-nav");
@@ -598,6 +600,27 @@ function setupAuthHandlers() {
     event.preventDefault();
     const email = $("#auth-email").value.trim();
     const password = $("#auth-password").value;
+    if (authMode === "builtin") {
+      setAuthMessage("Signing in…");
+      try {
+        const response = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Could not sign in.");
+        builtinToken = result.access_token;
+        localStorage.setItem("novel-architect-auth-token", builtinToken);
+        authSession = { access_token: builtinToken, user: result.user };
+        showAuthPage(false);
+        await loadCurrentUser();
+        await loadApplication();
+      } catch (error) {
+        setAuthMessage(error.message || "Could not sign in.", true);
+      }
+      return;
+    }
     if (!authClient) {
       setAuthMessage("Authentication is not configured on this deployment.", true);
       return;
@@ -617,6 +640,28 @@ function setupAuthHandlers() {
   $("#sign-up").addEventListener("click", async () => {
     const email = $("#auth-email").value.trim();
     const password = $("#auth-password").value;
+    if (authMode === "builtin") {
+      setAuthMessage("Creating your account…");
+      try {
+        const response = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Could not create the account.");
+        builtinToken = result.access_token;
+        localStorage.setItem("novel-architect-auth-token", builtinToken);
+        authSession = { access_token: builtinToken, user: result.user };
+        showAuthPage(false);
+        await loadCurrentUser();
+        await loadApplication();
+        toast("Account created and signed in.");
+      } catch (error) {
+        setAuthMessage(error.message || "Could not create the account.", true);
+      }
+      return;
+    }
     if (!authClient) {
       setAuthMessage("Authentication is not configured on this deployment.", true);
       return;
@@ -668,6 +713,14 @@ function setupAuthHandlers() {
     });
   });
   $("#sign-out").addEventListener("click", async () => {
+    if (authMode === "builtin") {
+      builtinToken = "";
+      authSession = null;
+      localStorage.removeItem("novel-architect-auth-token");
+      showAuthPage(true);
+      setAuthMessage("Signed out.");
+      return;
+    }
     const { error } = await authClient.auth.signOut();
     if (error) toast(error.message);
   });
@@ -882,6 +935,7 @@ async function initialize() {
     authRedirectUrl = config.public_app_url
       ? config.public_app_url
       : `${window.location.origin}${window.location.pathname}`;
+    authMode = config.auth_mode || "supabase";
     oauthProviders = (config.oauth_providers || "google,github,apple,facebook")
       .split(",")
       .map((provider) => provider.trim())
@@ -889,6 +943,23 @@ async function initialize() {
     document.querySelectorAll("[data-provider]").forEach((button) => {
       button.hidden = !oauthProviders.includes(button.dataset.provider);
     });
+    if (authMode === "builtin") {
+      builtinToken = localStorage.getItem("novel-architect-auth-token") || "";
+      authSession = builtinToken ? { access_token: builtinToken } : null;
+      $("#login-button").hidden = Boolean(authSession);
+      $("#register-button").hidden = Boolean(authSession);
+      $("#sign-out").hidden = !authSession;
+      $("#magic-link").hidden = true;
+      document.querySelector(".oauth-actions").hidden = true;
+      if (!authSession) {
+        showAuthPage(true);
+        setAuthMessage("Create an account or log in to save your project.");
+        return;
+      }
+      await loadCurrentUser();
+      await loadApplication();
+      return;
+    }
     if (config.supabase_configured && window.supabase) {
       authClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key, {
         auth: {

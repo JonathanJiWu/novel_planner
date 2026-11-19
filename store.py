@@ -12,6 +12,10 @@ from web_app import load_project_data, save_project_data
 class ProjectStore:
     async def load(self, user_id: str, access_token: str | None = None) -> dict[str, Any]:
         if not settings.configured:
+            from auth_store import auth_store
+            data = auth_store.load_project(user_id)
+            if data is not None:
+                return data
             return load_project_data()
 
         response = await self._request(
@@ -35,7 +39,8 @@ class ProjectStore:
         access_token: str | None = None,
     ) -> dict[str, Any]:
         if not settings.configured:
-            return save_project_data(data)
+            from auth_store import auth_store
+            return auth_store.save_project(user_id, data)
 
         clean_data = dict(data)
         clean_data["saved_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -57,6 +62,9 @@ class ProjectStore:
         return clean_data
 
     async def list_projects(self) -> list[dict[str, Any]]:
+        if not settings.configured:
+            from auth_store import auth_store
+            return auth_store.list_projects()
         if not settings.supabase_service_role_key:
             raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is required for database administration.")
         response = await self._request(
@@ -70,6 +78,10 @@ class ProjectStore:
         return response.json()
 
     async def delete_project(self, owner_id: str) -> None:
+        if not settings.configured:
+            from auth_store import auth_store
+            auth_store.delete_project(owner_id)
+            return
         if not settings.supabase_service_role_key:
             raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is required for database administration.")
         response = await self._request(

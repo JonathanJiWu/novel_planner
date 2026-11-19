@@ -27,6 +27,8 @@ class Settings:
         if origin.strip()
     )
     auth_required: bool = os.getenv("AUTH_REQUIRED", "").lower() in {"1", "true", "yes"}
+    auth_secret: str = os.getenv("AUTH_SECRET", "novel-architect-local-development-secret")
+    database_path: str = os.getenv("NOVEL_PLANNER_DB", "novel_planner.db")
 
     @property
     def configured(self) -> bool:

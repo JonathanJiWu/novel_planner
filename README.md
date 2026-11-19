@@ -75,12 +75,16 @@ For projects that need sign-in and access across devices, Novel Architect includ
 6. Set `SUPABASE_SERVICE_ROLE_KEY` only on the server.
 7. Set `ADMIN_EMAILS` to a comma-separated allowlist of administrator emails.
 8. In GitHub, add `RENDER_DEPLOY_HOOK_URL` as an Actions secret.
+9. Set `AUTH_SECRET` to a long random server-only value.
+10. Set `NOVEL_PLANNER_DB` to a persistent disk path for SQLite accounts and projects.
 
 After setup, [`.github/workflows/deploy-render.yml`](.github/workflows/deploy-render.yml)
 triggers a Render deployment for every push to `main` or manual workflow run.
 
 ### Persistent accounts and database administration
 
+- A built-in account system uses password-scrypt hashing and signed bearer sessions when Supabase variables are not configured.
+- Built-in accounts and projects are stored in SQLite at `NOVEL_PLANNER_DB`; attach persistent disk storage to preserve them across Render restarts.
 - Supabase Auth provides email/password, magic-link, OAuth, and GitHub sign-in.
 - Login and Register controls appear in the top-right account area; signed-in users see Sign out.
 - `supabase_schema.sql` creates `public.projects` for per-user saved plans and `public.profiles` for user metadata.

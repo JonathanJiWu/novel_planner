@@ -32,8 +32,30 @@ def _token_from_header(authorization: str | None) -> str:
 
 
 def require_user(authorization: str | None = Header(default=None)) -> AuthenticatedUser:
-    if not settings.configured and not settings.auth_required:
-        return AuthenticatedUser("local-development-user")
+    if not isinstance(authorization, str):
+        authorization = None
+    if not settings.configured:
+        if not authorization:
+            if not settings.auth_required:
+                return AuthenticatedUser("local-development-user")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication is required.",
+            )
+        if authorization.startswith("Bearer "):
+            from auth_store import auth_store
+            try:
+                claims = auth_store.verify_token(authorization[7:].strip())
+                return AuthenticatedUser(claims["id"], claims["email"], authorization[7:].strip())
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=str(exc),
+                ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication is required.",
+        )
 
     token = _token_from_header(authorization)
     try:

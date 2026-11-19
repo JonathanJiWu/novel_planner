@@ -24,3 +24,11 @@ services:
         sync: false
       - key: AUTH_REQUIRED
         value: "true"
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: NOVEL_PLANNER_DB
+        value: "/var/data/novel_planner.db"
+    disk:
+      name: novel-planner-data
+      mountPath: /var/data
+      sizeGB: 1

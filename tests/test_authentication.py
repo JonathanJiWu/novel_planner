@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 import auth
 from auth import AuthenticatedUser
+from auth_store import AuthStore
 from config import Settings
 
 
@@ -71,3 +72,26 @@ def test_auth_frontend_contains_password_and_all_supported_providers():
     assert "signUp" in javascript
     assert "signInWithOAuth" in javascript
     assert "detectSessionInUrl: true" in javascript
+
+
+def test_builtin_auth_register_login_and_project_persistence(tmp_path):
+    store = AuthStore(tmp_path / "auth.db")
+
+    token, user = store.register("Writer@Example.com", "secure-password")
+    assert token
+    assert user["email"] == "writer@example.com"
+    assert store.verify_token(token)["email"] == "writer@example.com"
+
+    with pytest.raises(ValueError, match="already exists"):
+        store.register("writer@example.com", "another-password")
+
+    login_token, login_user = store.login("WRITER@example.com", "secure-password")
+    assert login_token
+    assert login_user["id"] == user["id"]
+
+    saved = store.save_project(user["id"], {"title": "Persistent Novel", "answers": {}, "ideas": []})
+    assert saved["title"] == "Persistent Novel"
+    assert store.load_project(user["id"])["title"] == "Persistent Novel"
+
+    with pytest.raises(ValueError, match="Invalid email or password"):
+        store.login("writer@example.com", "wrong-password")

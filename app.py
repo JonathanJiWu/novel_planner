@@ -8,18 +8,25 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from auth import AuthenticatedUser, require_admin, require_user
 from config import settings
 from novel_architect import NovelProject, build_planning_stages
 from store import ProjectStore
 from web_app import MAX_REQUEST_BYTES, build_markdown, build_pdf, validate_project_data
+from auth_store import auth_store
 
 
 ROOT = Path(__file__).resolve().parent
 WEB_ROOT = ROOT / "web"
 store = ProjectStore()
 app = FastAPI(title="Novel Architect", version="1.0")
+
+
+class AuthRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=8, max_length=200)
 
 if settings.allowed_origins:
     app.add_middleware(
@@ -45,7 +52,26 @@ async def public_config() -> dict[str, str | bool]:
         "auth_required": settings.auth_required,
         "public_app_url": settings.public_app_url,
         "oauth_providers": ",".join(settings.oauth_providers),
+        "auth_mode": "supabase" if settings.configured else "builtin",
     }
+
+
+@app.post("/api/auth/register")
+async def register(payload: AuthRequest) -> dict[str, Any]:
+    try:
+        token, user = auth_store.register(payload.email, payload.password)
+        return {"access_token": token, "token_type": "bearer", "user": user}
+    except ValueError as exc:
+        raise HTTPException(status_code=409 if "exists" in str(exc) else 400, detail=str(exc)) from exc
+
+
+@app.post("/api/auth/login")
+async def login(payload: AuthRequest) -> dict[str, Any]:
+    try:
+        token, user = auth_store.login(payload.email, payload.password)
+        return {"access_token": token, "token_type": "bearer", "user": user}
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
 @app.get("/api/me")

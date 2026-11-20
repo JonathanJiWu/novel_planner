@@ -44,6 +44,8 @@ store = ProjectStore()
 login_failures_per_account = SlidingWindowLimiter(10, 15 * 60)
 login_failures_per_client = SlidingWindowLimiter(100, 15 * 60)
 registrations_per_client = SlidingWindowLimiter(20, 60 * 60)
+# Exports of a project sent in the request (visitors who have not signed in).
+exports_per_client = SlidingWindowLimiter(30, 60)
 
 
 class AuthRequest(BaseModel):
@@ -316,14 +318,17 @@ async def stages() -> list[dict[str, str]]:
 
 
 async def _export(pdf: bool, user: AuthenticatedUser) -> Response:
-    data = await _load_project(user)
+    return await _render_export(await _load_project(user), pdf, user.user_id)
+
+
+async def _render_export(data: dict[str, Any], pdf: bool, owner: str) -> Response:
     try:
         if pdf:
             content = await run_in_threadpool(build_pdf, data)
         else:
             content = build_markdown(data).encode("utf-8")
     except Exception as exc:  # noqa: BLE001 - never leak renderer internals to the client
-        logger.error("Export failed for %s: %s", user.user_id, exc, exc_info=exc)
+        logger.error("Export failed for %s: %s", owner, exc, exc_info=exc)
         raise HTTPException(status_code=500, detail="The export could not be generated.") from exc
     extension, media_type = ("pdf", "application/pdf") if pdf else ("md", "text/markdown; charset=utf-8")
     return Response(
@@ -341,6 +346,31 @@ async def export_markdown(user: AuthenticatedUser = Depends(require_user)) -> Re
 @app.get("/api/export/pdf")
 async def export_pdf(user: AuthenticatedUser = Depends(require_user)) -> Response:
     return await _export(True, user)
+
+
+async def _export_sent_project(request: Request, pdf: bool) -> Response:
+    """Render a project sent in the request body; nothing is stored."""
+    client = _client_id(request)
+    retry_after = exports_per_client.retry_after(client)
+    if retry_after:
+        raise _too_many_requests(retry_after)
+    exports_per_client.hit(client)
+    payload = await _read_json_body(request)
+    try:
+        data = validate_project_data(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return await _render_export(data, pdf, "a visitor")
+
+
+@app.post("/api/export")
+async def export_sent_markdown(request: Request) -> Response:
+    return await _export_sent_project(request, False)
+
+
+@app.post("/api/export/pdf")
+async def export_sent_pdf(request: Request) -> Response:
+    return await _export_sent_project(request, True)
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False)

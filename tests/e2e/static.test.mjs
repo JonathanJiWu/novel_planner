@@ -1,8 +1,10 @@
-// Browser journeys against the static GitHub Pages build (browser-only profiles in IndexedDB).
+// Browser journeys against the static GitHub Pages build. Visitors plan right
+// away (saved in this browser); optional profiles also live only in this browser.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  PASSWORD, addIdea, download, launchBrowser, logIn, newPage, register, startStaticServer, waitForSaved,
+  PASSWORD, addIdea, signOut, download, launchBrowser, logIn, newPage, openSignIn, register, startStaticServer,
+  statusText, waitForSaved,
 } from "./harness.mjs";
 
 let server;
@@ -18,10 +20,34 @@ after(async () => {
   await server?.stop();
 });
 
-test("a project saved before profiles existed is restored into the first profile", async () => {
+async function open(context) {
+  const page = await context.newPage();
+  await page.goto(server.app);
+  await waitForSaved(page);
+  return page;
+}
+
+test("the demo opens straight into planning, with work kept in this browser", async () => {
   const { context, page } = await newPage(browser);
   await page.goto(server.app);
-  await page.waitForSelector("#auth-page:not([hidden])"); // start-up has finished
+  await waitForSaved(page);
+  assert.equal(await statusText(page), "Saved in this browser");
+  assert.equal(await page.isVisible("#auth-dialog"), false, "no sign-in wall");
+  await page.fill("#project-title", "Browser-only novel");
+  await addIdea(page, "Stored in IndexedDB");
+  await waitForSaved(page);
+  await page.reload();
+  await waitForSaved(page);
+  assert.equal(await page.inputValue("#project-title"), "Browser-only novel");
+  assert.equal(await page.locator(".idea-text", { hasText: "Stored in IndexedDB" }).count(), 1);
+  assert.deepEqual(page.errors, []);
+  await context.close();
+});
+
+test("a project saved by the first version of the demo is restored, and moves into a new profile", async () => {
+  const { context, page } = await newPage(browser);
+  await page.goto(server.app);
+  await waitForSaved(page);
   await page.evaluate(() => localStorage.setItem("novel-architect-project", JSON.stringify({
     title: "My Older Demo Novel",
     answers: { story_seed: "A lighthouse that remembers ships" },
@@ -29,58 +55,62 @@ test("a project saved before profiles existed is restored into the first profile
     materials: [],
     theme: "paper",
   })));
+  await page.evaluate(() => new Promise((resolve) => {
+    const request = indexedDB.open("novel-architect-auth", 1);
+    request.onsuccess = () => {
+      const transaction = request.result.transaction("projects", "readwrite");
+      transaction.objectStore("projects").delete("guest");
+      transaction.oncomplete = () => resolve();
+    };
+  }));
   await page.reload();
-  await register(page, "demo@example.com");
-  assert.equal(await page.inputValue("#project-title"), "My Older Demo Novel");
+  await waitForSaved(page);
+  assert.equal(await page.inputValue("#project-title"), "My Older Demo Novel", "restored without signing in");
   assert.equal(await page.locator(".idea-card").count(), 1);
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "paper");
-  assert.equal(await page.evaluate(() => localStorage.getItem("novel-architect-project")), null);
   assert.ok(await page.evaluate(() => localStorage.getItem("novel-architect-project-migrated")), "a backup copy is kept");
 
-  // A second profile does not receive the same project again.
-  await page.click("#sign-out");
+  await register(page, "demo@example.com");
+  assert.equal(await page.inputValue("#project-title"), "My Older Demo Novel", "the work moves into the profile");
+  await signOut(page);
+  assert.equal(await page.inputValue("#project-title"), "My Novel", "a fresh page after signing out");
   await register(page, "second@example.com");
-  assert.equal(await page.inputValue("#project-title"), "My Novel");
+  assert.equal(await page.inputValue("#project-title"), "My Novel", "a second profile does not receive it again");
   await context.close();
 });
 
 test("profiles are explained honestly and keep projects separate", async () => {
   const { context, page } = await newPage(browser);
   await page.goto(server.app);
-  await page.waitForSelector("#auth-page:not([hidden])");
+  await waitForSaved(page);
+  await openSignIn(page);
   assert.match(await page.textContent("#auth-intro"), /in this browser only/);
   assert.equal(await page.isVisible("#magic-link"), false);
   assert.equal(await page.isVisible(".oauth-actions"), false);
+  await page.click("#auth-continue");
 
+  await page.fill("#project-title", "Profile novel");
   await register(page, "writer@example.com");
-  await page.fill("#project-title", "Browser-only novel");
-  await addIdea(page, "Stored in IndexedDB");
-  await waitForSaved(page);
-  assert.equal((await page.textContent("#save-state")).trim(), "Saved in this browser");
+  assert.equal(await statusText(page), "Saved in this browser");
+  await signOut(page);
 
-  await page.click("#sign-out");
-  await page.waitForSelector("#auth-page:not([hidden])");
+  await openSignIn(page);
   await page.fill("#auth-email", "writer@example.com");
   await page.fill("#auth-password", "wrong-password");
   await page.click("#sign-in");
   await page.waitForFunction(() => document.querySelector("#auth-message").classList.contains("error"));
-
   await logIn(page, "writer@example.com", PASSWORD);
-  assert.equal(await page.inputValue("#project-title"), "Browser-only novel");
+  assert.equal(await page.inputValue("#project-title"), "Profile novel");
   await page.reload();
   await waitForSaved(page);
-  assert.equal(await page.locator(".idea-text", { hasText: "Stored in IndexedDB" }).count(), 1);
+  assert.equal(await page.inputValue("#project-title"), "Profile novel");
   await context.close();
 });
 
-test("two tabs of the same browser profile do not overwrite each other silently", async () => {
-  const { context, page: first } = await newPage(browser);
-  await first.goto(server.app);
-  await register(first, "tabs@example.com");
-  const second = await context.newPage();
-  await second.goto(server.app);
-  await waitForSaved(second);
-
+test("two tabs in the same browser do not overwrite each other silently", async () => {
+  const { context } = await newPage(browser);
+  const first = await open(context);
+  const second = await open(context);
   await first.fill("#project-title", "From the first tab");
   await waitForSaved(first);
   await second.fill("#project-title", "From the second tab");
@@ -90,12 +120,12 @@ test("two tabs of the same browser profile do not overwrite each other silently"
   await context.close();
 });
 
-test("exports produce the full blueprint and a printable plan", async () => {
+test("exports produce the full blueprint and a printable plan with the readiness assessment", async () => {
   const { context, page } = await newPage(browser);
   await page.goto(server.app);
-  await register(page, "export@example.com");
+  await waitForSaved(page);
   await page.fill("#project-title", "Printable Novel");
-  await page.click("[data-open-stage]");
+  await page.click("#continue-planning");
   await page.locator('.question-card[data-question-id="story_identity"] textarea').fill("Line one\nLine two");
   assert.equal((await page.textContent("#export-pdf")).trim(), "↓  Print or save as PDF");
 
@@ -103,6 +133,8 @@ test("exports produce the full blueprint and a printable plan", async () => {
   assert.ok(markdown.startsWith("# Printable Novel\n"));
   assert.ok(markdown.includes("### Stage A — Story Identity"));
   assert.ok(markdown.includes("  - Line one\n    Line two\n"));
+  assert.ok(markdown.includes("## Ready to Write Chapter One?"));
+  assert.ok(markdown.includes("## Pre-drafting checklist"));
 
   await page.evaluate(() => {
     window.__printed = [];
@@ -114,6 +146,7 @@ test("exports produce the full blueprint and a printable plan", async () => {
   const printView = await page.textContent("#print-view");
   assert.ok(printView.includes("Printable Novel"));
   assert.ok(printView.includes("Stage J — Continuity & Readiness"));
+  assert.ok(printView.includes("Ready to Write Chapter One?"));
   assert.ok(printView.includes("Line one\nLine two"));
   await context.close();
 });

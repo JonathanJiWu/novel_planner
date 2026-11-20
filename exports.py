@@ -10,7 +10,8 @@ from typing import Any
 from xml.sax.saxutils import escape
 
 from config import PROJECT_ROOT
-from novel_architect import NovelProject, build_planning_stages, planning_label
+from novel_architect import NovelProject, build_planning_stages, planning_label, question_catalog
+from readiness import SECTIONS, assess, dimension_line, other_open_line, readiness_markdown, verdict
 
 
 logger = logging.getLogger("novel_architect.exports")
@@ -105,9 +106,14 @@ def _project_from_data(data: dict[str, Any]) -> NovelProject:
     return project
 
 
+def readiness_report(data: dict[str, Any]) -> dict[str, Any]:
+    return assess(data, question_catalog(), build_planning_stages())
+
+
 def build_markdown(data: dict[str, Any]) -> str:
     project = _project_from_data(data)
     markdown = project.to_markdown()
+    markdown += "\n" + readiness_markdown(readiness_report(data))
     if data.get("question_states"):
         markdown += "\n## Decision confidence\n\n"
         for question_id, state in data["question_states"].items():
@@ -233,7 +239,8 @@ def build_pdf(data: dict[str, Any]) -> bytes:
             story.append(paragraph(stage["purpose"], "BlueprintBody"))
             story.append(Paragraph(
                 f"<b>Output:</b> {pdf_markup(stage['output'])}<br/>"
-                f"<b>Completion:</b> {pdf_markup(stage['completion'])}",
+                f"<b>Completion:</b> {pdf_markup(stage['completion'])}<br/>"
+                f"<b>Draws on:</b> {pdf_markup(stage['sources'])}",
                 styles["BlueprintBody"],
             ))
         for question in questions:
@@ -243,6 +250,27 @@ def build_pdf(data: dict[str, Any]) -> bytes:
             certainty = planning_label(state.get("certainty", "needs_work"))
             story.append(paragraph(question.prompt, "BlueprintQuestion"))
             story.append(paragraph(answer, "BlueprintBody", prefix=f"<b>{escape(status)} · {escape(certainty)}</b><br/>"))
+    report = readiness_report(data)
+    story.append(PageBreak())
+    story.append(Paragraph("Ready to Write Chapter One?", styles["BlueprintHeading"]))
+    story.append(paragraph(verdict(report), "BlueprintBody"))
+    for dimension in report["dimensions"]:
+        story.append(paragraph(dimension_line(dimension), "BlueprintBody", prefix="• "))
+    for key, heading in SECTIONS:
+        if report[key]:
+            story.append(Paragraph(heading, styles["BlueprintQuestion"]))
+            for entry in report[key]:
+                story.append(paragraph(f"{entry['stage']}: {entry['prompt']}", "BlueprintBody", prefix="• "))
+    if report["other_open"]:
+        story.append(paragraph(other_open_line(report["other_open"]), "BlueprintBody"))
+    story.append(Paragraph("Your assessment", styles["BlueprintQuestion"]))
+    story.append(paragraph(report["assessment"] or "Not yet written.", "BlueprintBody"))
+    story.append(Paragraph("Pre-drafting checklist", styles["BlueprintHeading"]))
+    for item in report["checklist"] or [{"done": False, "stage": "", "prompt": "No decisions are currently marked essential."}]:
+        mark = "☑" if item["done"] else "☐"
+        label = f"{item['stage']}: {item['prompt']}" if item["stage"] else item["prompt"]
+        story.append(paragraph(label, "BlueprintBody", prefix=f"{mark} "))
+
     if data.get("ideas") or data.get("materials"):
         story.append(PageBreak())
         story.append(Paragraph("Collected Material", styles["BlueprintHeading"]))

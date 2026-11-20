@@ -82,7 +82,7 @@ def test_static_github_pages_auth_fallback_is_complete():
     assert "openStaticAuthDatabase" in javascript
     assert "staticRegister" in javascript
     assert "staticLogin" in javascript
-    assert "saveStaticProject" in javascript
+    assert "saveBrowserProject" in javascript
     assert "PBKDF2" in javascript
     assert "indexedDB" in javascript
 

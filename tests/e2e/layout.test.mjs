@@ -43,7 +43,7 @@ test("every theme restyles the whole interface with readable text", async () => 
     });
     assert.ok(contrast(idea.color, idea.background) >= 4.5, `${theme}: idea text contrast ${contrast(idea.color, idea.background)}`);
 
-    await page.click("[data-open-stage]");
+    await page.click("#continue-planning");
     const surfaces = await page.evaluate(() => {
       const read = (selector) => getComputedStyle(document.querySelector(selector)).backgroundColor;
       return { body: read("body"), guide: read(".stage-guide"), select: read(".answer-controls select") };
@@ -58,13 +58,25 @@ test("every theme restyles the whole interface with readable text", async () => 
   await context.close();
 });
 
+test("the three appearance modes are offered by name", async () => {
+  const { context, page } = await newPage(browser);
+  await page.goto(server.url);
+  await waitForSaved(page);
+  const options = await page.$$eval("#theme-select option", (items) => items.map((item) => [item.value, item.textContent]));
+  assert.deepEqual(options, [["dark", "Dark mode"], ["light", "Bright mode"], ["paper", "Parchment mode"]]);
+  await page.selectOption("#theme-select", "paper");
+  const texture = await page.evaluate(() => getComputedStyle(document.body).backgroundImage);
+  assert.match(texture, /data:image\/svg\+xml/, "parchment mode has a paper texture");
+  await context.close();
+});
+
 test("controls hidden by the app stay hidden", async () => {
   // Regression: CSS display rules overrode the hidden attribute, so Register and
   // Database admin showed up in local mode.
   const { context, page } = await newPage(browser);
   await page.goto(server.url);
   await waitForSaved(page);
-  for (const selector of ["#register-button", "#login-button", "#sign-out", "#admin-button", "#sync-banner"]) {
+  for (const selector of ["#login-button", "#sign-out", "#admin-button", "#sync-banner", "#account-prompt"]) {
     assert.equal(await page.isVisible(selector), false, selector);
   }
   await context.close();

@@ -29,7 +29,7 @@ test("planning work autosaves and survives a reload", async () => {
   const { context, page } = await open();
   await page.fill("#project-title", "The Quiet Archive");
   await addIdea(page, "A lighthouse keeper who collects lost letters.", "Character");
-  await page.click("[data-open-stage]");
+  await page.click("#continue-planning");
   const card = page.locator('.question-card[data-question-id="story_identity"]');
   await card.locator("textarea").fill("A librarian finds a forbidden record.\nIt names her mother.");
   await card.locator("select").nth(1).selectOption("settled");
@@ -41,7 +41,7 @@ test("planning work autosaves and survives a reload", async () => {
   assert.equal(await page.inputValue("#project-title"), "The Quiet Archive");
   assert.equal(await page.locator(".idea-card").count(), 1);
   assert.equal(await page.locator(".idea-category-select").inputValue(), "Character");
-  await page.click("[data-open-stage]");
+  await page.click("#continue-planning");
   assert.equal(
     await page.locator('.question-card[data-question-id="story_identity"] textarea').inputValue(),
     "A librarian finds a forbidden record.\nIt names her mother.",
@@ -150,7 +150,7 @@ test("closing the page with unsaved changes asks for confirmation", async () => 
 
 test("the overview lists open decisions and links back to the planner", async () => {
   const { context, page } = await open();
-  await page.click("[data-open-stage]");
+  await page.click("#continue-planning");
   const card = page.locator('.question-card[data-question-id="story_seed"]');
   await card.locator("textarea").fill("A lighthouse that remembers every ship.");
   await waitForSaved(page);
@@ -168,7 +168,7 @@ test("the overview lists open decisions and links back to the planner", async ()
 test("exports download the saved plan as Markdown and PDF", async () => {
   const { context, page } = await open();
   await page.fill("#project-title", "Export Novel");
-  await page.click("[data-open-stage]");
+  await page.click("#continue-planning");
   await page.locator('.question-card[data-question-id="story_identity"] textarea').fill("林黛玉 writes poems — Пушкин reads them.");
   const markdown = (await download(page, "#export-markdown")).toString("utf8");
   assert.ok(markdown.startsWith("# Export Novel\n"));

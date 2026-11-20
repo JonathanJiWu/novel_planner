@@ -35,6 +35,9 @@ class Question:
     answer: str = ""
     planning_level: str = "important"
     affects: str = ""
+    strong: str = ""
+    weak: str = ""
+    template: str = ""
 
     @property
     def status(self) -> str:
@@ -136,6 +139,7 @@ class NovelProject:
                 sections.append(f"- **Watch for:** {stage['watch_for']}")
                 sections.append(f"- **Output:** {stage['output']}")
                 sections.append(f"- **Move on when:** {stage['completion']}")
+                sections.append(f"- **Draws on:** {stage['sources']}")
                 sections.append("")
             for question in questions:
                 answer_text = question.answer or "Not yet answered"
@@ -211,6 +215,10 @@ def run_interactive(project: NovelProject) -> NovelProject:
             print(f"Guidance: {question.guidance}")
         if question.examples:
             print(f"Example: {question.examples}")
+        if question.strong:
+            print(f"A strong answer: {question.strong}")
+        if question.weak:
+            print(f"Watch out for: {question.weak}")
         answer = input("Your answer (leave blank to skip): ").strip()
         if answer:
             project.set_answer(question.question_id, answer)

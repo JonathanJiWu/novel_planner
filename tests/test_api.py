@@ -220,6 +220,28 @@ def test_exports_use_the_saved_project(client):
     assert pdf.headers["cache-control"] == "no-store"
 
 
+def test_visitors_can_export_without_signing_in(client):
+    payload = project_payload(answers={"story_identity": "A guest's premise"})
+    markdown = client.post("/api/export", json=payload)
+    assert markdown.status_code == 200
+    assert markdown.text.startswith("# The Quiet Archive\n")
+    assert "A guest's premise" in markdown.text
+    assert "## Ready to Write Chapter One?" in markdown.text
+    pdf = client.post("/api/export/pdf", json=payload)
+    assert pdf.status_code == 200
+    assert pdf.content.startswith(b"%PDF")
+    assert client.post("/api/export", json={"title": "x", "theme": "neon"}).status_code == 400
+    assert client.get("/api/project").status_code == 401  # nothing is stored for visitors
+
+
+def test_visitor_exports_are_rate_limited(client):
+    for _ in range(30):
+        assert client.post("/api/export", json=project_payload()).status_code == 200
+    limited = client.post("/api/export", json=project_payload())
+    assert limited.status_code == 429
+    assert int(limited.headers["Retry-After"]) > 0
+
+
 def test_storage_errors_do_not_leak_internal_details(client, monkeypatch):
     headers = register(client)
 

@@ -8,6 +8,9 @@
  *   builtin   app.py with its own accounts (SQLite)
  *   supabase  app.py with Supabase Auth and Postgres
  *   indexeddb static hosting (GitHub Pages): profiles and projects stay in this browser
+ *
+ * Signing in is optional in every mode: visitors plan right away with their
+ * project kept in this browser, and sign-in is offered as they work.
  */
 
 const Logic = window.PlannerLogic;
@@ -18,6 +21,7 @@ const SUPABASE_SDK = Object.freeze({
   integrity: "sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK",
 });
 const STORAGE_KEYS = Object.freeze({
+  promptDismissed: "novel-architect-signin-prompt-dismissed",
   token: "novel-architect-auth-token",
   staticEmail: "novel-architect-auth-email",
   legacyProject: "novel-architect-project",
@@ -25,10 +29,19 @@ const STORAGE_KEYS = Object.freeze({
   theme: "novel-architect-theme",
 });
 const AUTH_COPY = Object.freeze({
-  account: "Log in to keep your project private and available wherever you sign in.",
-  indexeddb: "This public demo keeps your profile and project in this browser only. Nothing is uploaded, "
-    + "nothing syncs to other devices, and clearing this site's data deletes it, so export your plan regularly.",
+  account: "Sign in or create an account to keep your project with your account and open it on any device. "
+    + "Anything you wrote before signing in comes with you.",
+  indexeddb: "Profiles keep separate projects for different people using this browser. This public demo has no server: "
+    + "profiles and projects stay in this browser only, don't sync to other devices, and are deleted if this site's data "
+    + "is cleared, so export your plan regularly. Anything you wrote before signing in comes with you.",
 });
+const PROMPT_COPY = Object.freeze({
+  account: "Your work is saved in this browser. Sign in or create an account to keep it with your account and open it on any device.",
+  indexeddb: "Your work is saved in this browser. If other people use this browser, create a profile to keep your project "
+    + "separate. This demo has no server, so profiles stay on this device.",
+});
+const PROMPT_DISMISS_DAYS = 14;
+const GUEST_OWNER = "guest";
 const SAVE_DELAY = 400;
 const MAX_RETRY_DELAY = 30000;
 
@@ -41,6 +54,7 @@ let toastTimer;
 
 const session = {
   mode: "local",
+  target: "local",
   token: "",
   user: null,
   supabase: null,
@@ -110,7 +124,7 @@ function setStatus(message, tone = "ok") {
 }
 
 function savedLabel() {
-  return session.mode === "indexeddb" ? "Saved in this browser" : "All changes saved";
+  return ["guest", "profile", "memory"].includes(session.target) ? "Saved in this browser" : "All changes saved";
 }
 
 function option(value, label) {
@@ -194,9 +208,10 @@ function hasUnsavedWork() {
 }
 
 async function persist(payload) {
-  if (session.mode === "indexeddb") {
+  if (session.target === "guest" || session.target === "profile") {
+    const owner = session.target === "guest" ? GUEST_OWNER : session.staticUser.id;
     try {
-      return { ok: true, project: await saveStaticProject(payload) };
+      return { ok: true, project: await saveBrowserProject(owner, payload) };
     } catch (error) {
       if (error && error.conflict) return { ok: false, status: 409, project: error.current };
       return { ok: false, status: 0, detail: "This browser could not store the project." };
@@ -267,6 +282,7 @@ async function saveProject({ force = false } = {}) {
       sync.dirty = false;
       setStatus(savedLabel());
       renderProgress();
+      maybeOfferSignIn();
       return true;
     }
     // More edits arrived while saving; store them too.
@@ -277,9 +293,16 @@ async function saveProject({ force = false } = {}) {
     return false;
   }
   if (result.status === 401) {
+    session.target = "expired";
+    session.token = "";
+    writeStorage(STORAGE_KEYS.token, null);
     sync.blocked = { kind: "auth", message: "Session expired" };
-    setStatus("Not saved — log in again", "error");
-    showAuthPage("Your session has expired. Log in again to save your changes — they are still in this window.", { error: true });
+    setStatus("Not saved — sign in again", "error");
+    renderAccountControls();
+    showAuthPage(
+      "Your session has expired. Sign in again to keep saving to your account, or continue without signing in to keep your changes in this browser.",
+      { error: true, reason: "expired" },
+    );
     return false;
   }
   if (result.status === 400 || result.status === 413 || result.status === 422) {
@@ -369,6 +392,7 @@ function renderProgress() {
   $("#progress-value").textContent = `${percent}%`;
   $("#progress-bar").style.width = `${percent}%`;
   $("#progress-detail").textContent = `${settled} of ${total} essential decisions settled`;
+  renderContinueCard();
   renderNavigation();
 }
 
@@ -446,6 +470,7 @@ function overviewEntries(filter) {
 }
 
 function renderOverview() {
+  renderReadiness();
   const list = $("#overview-list");
   const query = ($("#overview-search").value || "").trim().toLowerCase();
   const filter = $("#overview-filter").value;
@@ -479,10 +504,7 @@ function renderOverview() {
       edit.type = "button";
       edit.className = "secondary-button";
       edit.textContent = "Open in planner";
-      edit.addEventListener("click", () => {
-        const question = questionById(entry.questionId);
-        showStage(stages.findIndex((stage) => stage.title === question.section), entry.questionId);
-      });
+      edit.addEventListener("click", () => openQuestion(entry.questionId));
       card.append(edit);
     }
     if (entry.type === "materials") {
@@ -538,13 +560,79 @@ function showInbox() {
   renderNavigation();
 }
 
-function showOverview() {
+function showOverview({ focusReadiness = false } = {}) {
   activeStage = -2;
   setActiveSection("overview-page");
   $("#current-breadcrumb").textContent = "PROJECT OVERVIEW";
   renderOverview();
   renderNavigation();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (focusReadiness) $("#readiness").scrollIntoView({ block: "start" });
+  else window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function excerpt(text, length = 220) {
+  const clean = String(text).replace(/\s+/g, " ").trim();
+  return clean.length > length ? `${clean.slice(0, length - 1)}…` : clean;
+}
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+/* Notes from the idea inbox and imported material filed under this stage's categories. */
+function renderStageNotes(stage) {
+  const block = $("#stage-notes");
+  const categories = Logic.categoriesForStage(stage.title);
+  const notes = [
+    ...state.ideas.filter((idea) => categories.includes(idea.category)).map((idea) => ({ text: idea.text, source: "Idea" })),
+    ...state.materials
+      .filter((material) => categories.includes(material.category) && material.status !== "archived")
+      .map((material) => ({ text: material.text, source: `${Logic.planningLabel(material.status)} material · ${material.source}` })),
+  ];
+  block.hidden = notes.length === 0;
+  if (!notes.length) return;
+  $("#stage-notes-summary").textContent = `Your notes for this stage (${notes.length}) — ${categories.join(" and ")}`;
+  const list = $("#stage-notes-list");
+  list.replaceChildren();
+  notes.forEach((note) => {
+    const item = element("li");
+    item.append(element("span", "note-source", note.source), element("span", "note-text", excerpt(note.text, 400)));
+    list.append(item);
+  });
+}
+
+function questionContext(question, promptsById) {
+  const dependencies = question.dependencies || [];
+  if (!dependencies.length) return null;
+  const answered = dependencies.filter((id) => Logic.answerText(state.answers, id)).length;
+  const details = element("details", "question-context");
+  details.append(element("summary", "", `What you've already decided (${answered} of ${dependencies.length} answered)`));
+  dependencies.forEach((id) => {
+    const answer = Logic.answerText(state.answers, id);
+    const item = element("p", "context-item");
+    item.append(element("strong", "", promptsById.get(id) || id), element("span", answer ? "" : "context-missing", answer ? excerpt(answer) : "Not answered yet."));
+    details.append(item);
+  });
+  return details;
+}
+
+function answerHelp(question) {
+  const details = element("details", "answer-help");
+  details.append(element("summary", "", "What makes a strong answer"));
+  [
+    ["A strong answer", question.strong],
+    ["A common weak answer", question.weak],
+    ["Example", question.examples],
+  ].forEach(([label, text]) => {
+    if (!text) return;
+    const paragraph = element("p");
+    paragraph.append(element("strong", "", `${label}: `), document.createTextNode(text));
+    details.append(paragraph);
+  });
+  return details;
 }
 
 function showStage(index, focusQuestionId) {
@@ -563,20 +651,16 @@ function showStage(index, focusQuestionId) {
     ["A WAY IN", stage.method],
     ["TRY THIS", stage.exercise],
   ].forEach(([label, text]) => {
-    const block = document.createElement("div");
-    block.className = "guide-block";
-    const tag = document.createElement("span");
-    tag.className = "guide-label";
-    tag.textContent = label;
-    const copy = document.createElement("p");
-    copy.textContent = text;
-    block.append(tag, copy);
+    const block = element("div", "guide-block");
+    block.append(element("span", "guide-label", label), element("p", "", text));
     guide.append(block);
   });
   $("#stage-output").textContent = stage.output;
   $("#stage-completion").textContent = stage.completion;
   $("#stage-criteria").textContent = stage.criteria;
   $("#stage-watch").textContent = stage.watch_for;
+  $("#stage-sources").textContent = stage.sources;
+  renderStageNotes(stage);
   const container = $("#question-list");
   container.replaceChildren();
   const promptsById = new Map(questionBank.map((item) => [item.question_id, item.prompt]));
@@ -584,17 +668,12 @@ function showStage(index, focusQuestionId) {
 
   questionsForStage(stage.title).forEach((question) => {
     const blocked = Logic.blockedDependencies(question, state.answers).length > 0;
-    const card = document.createElement("article");
-    card.className = `question-card ${blocked ? "question-locked" : ""}`;
+    const card = element("article", `question-card ${blocked ? "question-locked" : ""}`);
     card.dataset.questionId = question.question_id;
-    const heading = document.createElement("h3");
-    heading.textContent = question.prompt;
-    const description = document.createElement("p");
-    description.className = "question-meta";
-    description.textContent = [question.definition, question.purpose].filter(Boolean).join(" ");
+    const heading = element("h3", "", question.prompt);
+    const description = element("p", "question-meta", [question.definition, question.purpose].filter(Boolean).join(" "));
 
-    const controls = document.createElement("div");
-    controls.className = "answer-controls";
+    const controls = element("div", "answer-controls");
     const importance = document.createElement("select");
     importance.setAttribute("aria-label", `Planning status for ${question.prompt}`);
     [
@@ -603,34 +682,46 @@ function showStage(index, focusQuestionId) {
       ["optional", "Optional"],
       ["deferred", "Deferred"],
       ["intentionally_unknown", "Intentionally unknown"],
-    ].forEach(([value, label]) => importance.append(option(value, label)));
+    ].forEach(([value, label]) => {
+      const choice = option(value, label);
+      choice.title = Logic.PLANNING_LEVEL_HELP[value];
+      importance.append(choice);
+    });
     const decision = document.createElement("select");
     decision.setAttribute("aria-label", `Decision state for ${question.prompt}`);
     [
       ["needs_work", "Needs development"],
       ["provisional", "Provisional"],
       ["settled", "Settled for now"],
-    ].forEach(([value, label]) => decision.append(option(value, label)));
+    ].forEach(([value, label]) => {
+      const choice = option(value, label);
+      choice.title = Logic.CERTAINTY_HELP[value];
+      decision.append(choice);
+    });
     const current = Logic.effectiveState(question, state.question_states);
     importance.value = current.planning_level;
     decision.value = current.certainty;
     importance.disabled = blocked;
     decision.disabled = blocked;
+    const statusHelp = element("p", "status-help");
+    const describeStatus = () => {
+      statusHelp.textContent = `${Logic.planningLabel(importance.value)}: ${Logic.PLANNING_LEVEL_HELP[importance.value]}`;
+    };
+    describeStatus();
     const updateQuestionState = () => {
       state.question_states[question.question_id] = {
         planning_level: importance.value,
         certainty: decision.value,
       };
+      describeStatus();
       markDirty();
       renderProgress();
     };
     importance.addEventListener("change", updateQuestionState);
     decision.addEventListener("change", updateQuestionState);
     [["PLANNING STATUS", importance], ["DECISION STATE", decision]].forEach(([labelText, select]) => {
-      const wrap = document.createElement("div");
-      const label = document.createElement("label");
-      label.textContent = labelText;
-      wrap.append(label, select);
+      const wrap = element("div");
+      wrap.append(element("label", "", labelText), select);
       controls.append(wrap);
     });
 
@@ -651,38 +742,38 @@ function showStage(index, focusQuestionId) {
       markDirty();
       renderProgress();
     });
-    card.append(heading, description, controls, textarea);
+
+    const context = questionContext(question, promptsById);
+    card.append(heading, description);
+    if (context) card.append(context);
+    card.append(controls, statusHelp, textarea);
+    if (question.template) {
+      const worksheet = element("button", "text-button worksheet-button", "Insert worksheet");
+      worksheet.type = "button";
+      worksheet.disabled = blocked;
+      worksheet.addEventListener("click", () => {
+        const existing = textarea.value.replace(/\s+$/, "");
+        textarea.value = existing ? `${existing}\n\n${question.template}` : question.template;
+        textarea.dispatchEvent(new Event("input"));
+        textarea.focus();
+      });
+      card.append(worksheet);
+    }
     if (blocked) {
-      const dependencyMessage = document.createElement("p");
-      dependencyMessage.className = "question-dependencies";
-      dependencyMessage.textContent = "Answer the prerequisite questions before developing this decision.";
-      card.append(dependencyMessage);
+      card.append(element("p", "question-dependencies", "Answer the prerequisite questions before developing this decision."));
     }
-    if (question.affects) {
-      const affects = document.createElement("p");
-      affects.className = "question-affects";
-      affects.textContent = `This connects to: ${question.affects}`;
-      card.append(affects);
-    }
-    if (question.dependencies && question.dependencies.length) {
-      const dependencies = document.createElement("p");
-      dependencies.className = "question-dependencies";
-      dependencies.textContent = `Builds on: ${question.dependencies.map((id) => promptsById.get(id) || id).join(" · ")}`;
-      card.append(dependencies);
-    }
-    if (question.guidance || question.examples) {
-      const hint = document.createElement("p");
-      hint.className = "question-hint";
-      hint.textContent = [question.guidance, question.examples ? `For example: ${question.examples}` : ""].filter(Boolean).join(" ");
-      card.append(hint);
-    }
+    if (question.guidance) card.append(element("p", "question-hint", question.guidance));
+    card.append(answerHelp(question));
+    if (question.affects) card.append(element("p", "question-affects", `This connects to: ${question.affects}`));
     container.append(card);
     if (question.question_id === focusQuestionId) focusTarget = { card, textarea };
   });
 
+  const last = index === stages.length - 1;
+  $("#stage-readiness-link").hidden = !last;
   $("#previous-stage").disabled = index === 0;
   $("#previous-stage").style.visibility = index === 0 ? "hidden" : "visible";
-  $("#next-stage").textContent = index === stages.length - 1 ? "Back to idea inbox" : "Next section →";
+  $("#next-stage").textContent = last ? "Back to idea inbox" : "Next section →";
   renderNavigation();
   if (focusTarget) {
     focusTarget.card.scrollIntoView({ block: "center" });
@@ -690,6 +781,80 @@ function showStage(index, focusQuestionId) {
   } else {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+}
+
+/* The response categories from readme.txt §5 and the decision states, explained once per stage page. */
+function renderStatusLegend() {
+  const legend = $("#status-legend");
+  legend.replaceChildren();
+  Object.entries(Logic.PLANNING_LEVEL_HELP).forEach(([value, help]) => {
+    legend.append(element("dt", "", Logic.planningLabel(value)), element("dd", "", help));
+  });
+  const certainties = { needs_work: "Needs development", provisional: "Provisional", settled: "Settled for now" };
+  Object.entries(Logic.CERTAINTY_HELP).forEach(([value, help]) => {
+    legend.append(element("dt", "", certainties[value]), element("dd", "", help));
+  });
+}
+
+/* "Begin planning" becomes "Continue with …" once work is underway (readme §9). */
+function nextPlanningStep() {
+  const answered = Object.values(state.answers).some((answer) => String(answer).trim());
+  if (!answered) return { label: "Begin planning", index: 0 };
+  const next = Logic.nextStageIndex(stages, questionBank, state.answers, state.question_states);
+  if (next >= 0) return { label: `Continue with ${stages[next].label}`, index: next };
+  return { label: "Review Chapter One readiness", index: -1 };
+}
+
+function renderContinueCard() {
+  if (!stages.length) return;
+  const { label } = nextPlanningStep();
+  $("#continue-planning-label").textContent = label;
+}
+
+function continuePlanning() {
+  const { index } = nextPlanningStep();
+  if (index >= 0) showStage(index);
+  else showOverview({ focusReadiness: true });
+}
+
+function openQuestion(questionId) {
+  const question = questionById(questionId);
+  if (question) showStage(stages.findIndex((stage) => stage.title === question.section), questionId);
+}
+
+function renderReadiness() {
+  const report = Logic.assess(state, questionBank, stages);
+  $("#readiness-verdict").textContent = Logic.readinessVerdict(report);
+  $("#readiness").classList.toggle("is-ready", report.ready);
+  const dimensions = $("#readiness-dimensions");
+  dimensions.replaceChildren();
+  report.dimensions.forEach((dimension) => {
+    const item = element("li", dimension.total && dimension.settled === dimension.total ? "complete" : "");
+    item.textContent = Logic.dimensionLine(dimension);
+    dimensions.append(item);
+  });
+  const lists = $("#readiness-lists");
+  lists.replaceChildren();
+  Logic.READINESS_SECTIONS.forEach(([key, heading]) => {
+    if (!report[key].length) return;
+    const group = element("div", "readiness-group");
+    group.append(element("h3", "", heading));
+    const list = element("ul");
+    report[key].forEach((entry) => {
+      const item = element("li");
+      const open = element("button", "text-button", "Open");
+      open.type = "button";
+      open.addEventListener("click", () => openQuestion(entry.question_id));
+      item.append(element("span", "", `${entry.stage}: ${entry.prompt}`), open);
+      list.append(item);
+    });
+    group.append(list);
+    lists.append(group);
+  });
+  if (report.other_open) lists.append(element("p", "readiness-note", Logic.otherOpenLine(report.other_open)));
+  const assessment = element("p", "readiness-note");
+  assessment.append(element("strong", "", "Your assessment: "), document.createTextNode(report.assessment || "Not yet written — answer the last question in Stage J."));
+  lists.append(assessment);
 }
 
 function renderAll() {
@@ -800,7 +965,8 @@ function downloadBlob(blob, fileName) {
 }
 
 async function exportPlan(kind) {
-  if (!(await saveProject())) {
+  const storageBlocked = Boolean(sync.blocked && sync.blocked.kind === "storage");
+  if (!(await saveProject()) && !storageBlocked) {
     toast(sync.blocked ? "Your latest changes are not saved yet, so the export was not created." : "Your changes could not be saved. Try exporting again.");
     return;
   }
@@ -814,14 +980,20 @@ async function exportPlan(kind) {
     }
     const markdown = Logic.buildMarkdown(state, questionBank, stages);
     downloadBlob(new Blob([markdown], { type: "text/markdown;charset=utf-8" }), "novel-writing-plan.md");
+    maybeOfferSignIn();
     return;
   }
-  const response = await apiFetch(kind === "pdf" ? "/api/export/pdf" : "/api/export");
+  const url = kind === "pdf" ? "/api/export/pdf" : "/api/export";
+  // Signed-in exports use the saved project; visitors send the project they see.
+  const response = isSignedIn() || session.target === "local"
+    ? await apiFetch(url)
+    : await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(projectPayload()) });
   if (!response.ok) {
     toast(await responseDetail(response, "The export could not be generated."));
     return;
   }
   downloadBlob(await response.blob(), kind === "pdf" ? "novel-writing-plan.pdf" : "novel-writing-plan.md");
+  maybeOfferSignIn();
 }
 
 function renderPrintView() {
@@ -845,6 +1017,7 @@ function renderPrintView() {
       add("p", guide.purpose, "print-guide");
       add("p", `Output: ${guide.output}`, "print-guide");
       add("p", `Completion: ${guide.completion}`, "print-guide");
+      add("p", `Draws on: ${guide.sources}`, "print-guide");
     }
     questionsForStage(stage.title).forEach((question) => {
       const decision = Logic.effectiveState(question, state.question_states);
@@ -853,6 +1026,24 @@ function renderPrintView() {
       add("p", Logic.answerText(state.answers, question.question_id) || "Not yet answered", "print-answer");
     });
   });
+  const report = Logic.assess(state, questionBank, stages);
+  add("h2", "Ready to Write Chapter One?");
+  add("p", Logic.readinessVerdict(report), "print-answer");
+  report.dimensions.forEach((dimension) => add("p", `• ${Logic.dimensionLine(dimension)}`, "print-guide"));
+  Logic.READINESS_SECTIONS.forEach(([key, heading]) => {
+    if (!report[key].length) return;
+    add("h3", heading);
+    report[key].forEach((entry) => add("p", `• ${entry.stage}: ${entry.prompt}`, "print-guide"));
+  });
+  if (report.other_open) add("p", Logic.otherOpenLine(report.other_open), "print-guide");
+  add("h3", "Your assessment");
+  add("p", report.assessment || "Not yet written.", "print-answer");
+  add("h2", "Pre-drafting checklist");
+  if (report.checklist.length) {
+    report.checklist.forEach((item) => add("p", `${item.done ? "☑" : "☐"} ${item.stage}: ${item.prompt}`, "print-guide"));
+  } else {
+    add("p", "No decisions are currently marked essential.", "print-guide");
+  }
   if (state.ideas.length || state.materials.length) {
     add("h2", "Collected Material");
     state.ideas.forEach((idea) => {
@@ -920,7 +1111,13 @@ async function loadAdminProjects() {
 }
 
 // ---------------------------------------------------------------------------
-// Accounts
+// Accounts are optional: everyone can plan without signing in. Work done
+// without an account is kept in this browser and comes along on sign-in.
+//
+// session.target says where the project is saved:
+//   local    web_app.py's project file          account  the signed-in account
+//   guest    this browser, not signed in         profile  a browser-only profile
+//   expired  signed out by the server mid-edit   memory   nowhere (storage blocked)
 // ---------------------------------------------------------------------------
 
 function accountsEnabled() {
@@ -928,24 +1125,21 @@ function accountsEnabled() {
 }
 
 function isSignedIn() {
-  if (session.mode === "indexeddb") return Boolean(session.staticUser);
-  if (session.mode === "builtin") return Boolean(session.token);
-  if (session.mode === "supabase") return Boolean(session.token);
-  return false;
+  return session.target === "account" || session.target === "profile";
 }
 
 function renderAccountControls() {
   const signedIn = isSignedIn();
   $("#login-button").hidden = !accountsEnabled() || signedIn;
-  $("#register-button").hidden = !accountsEnabled() || signedIn;
-  $("#sign-out").hidden = !accountsEnabled() || !signedIn;
-  const email = session.user && session.user.email;
-  $("#account-email").hidden = !(signedIn && email);
+  $("#sign-out").hidden = !signedIn;
+  const email = signedIn && session.user && session.user.email;
+  $("#account-email").hidden = !email;
   $("#account-email").textContent = email || "";
   $("#admin-button").hidden = !(signedIn && session.user && session.user.is_admin);
   const passwordless = session.mode === "supabase";
   $("#magic-link").hidden = !passwordless;
   document.querySelector(".oauth-actions").hidden = !passwordless;
+  if (signedIn || !accountsEnabled()) $("#account-prompt").hidden = true;
 }
 
 function setAuthMessage(message, failed = false) {
@@ -954,32 +1148,119 @@ function setAuthMessage(message, failed = false) {
   element.classList.toggle("error", failed);
 }
 
-function showAuthPage(message, { error = false } = {}) {
-  $("#auth-page").hidden = false;
-  document.querySelectorAll(".page-section").forEach((section) => section.classList.remove("active"));
-  $("#auth-intro").textContent = session.mode === "indexeddb" ? AUTH_COPY.indexeddb : AUTH_COPY.account;
-  if (message) setAuthMessage(message, error);
+let authReason = "signin";
+
+function showAuthPage(message, { error = false, reason = "signin" } = {}) {
+  authReason = reason;
+  const dialog = $("#auth-dialog");
+  const browserOnly = session.mode === "indexeddb";
+  $("#auth-title").textContent = browserOnly ? "Use a profile in this browser" : "Sign in to save your project";
+  $("#auth-intro").textContent = browserOnly ? AUTH_COPY.indexeddb : AUTH_COPY.account;
+  setAuthMessage(message || "", error);
   renderAccountControls();
+  if (!dialog.open) dialog.showModal();
   $("#auth-email").focus();
 }
 
 function hideAuthPage() {
-  $("#auth-page").hidden = true;
-  setAuthMessage("");
-  $("#auth-password").value = "";
-  renderAccountControls();
-  if (appLoaded) renderAll();
+  const dialog = $("#auth-dialog");
+  if (dialog.open) dialog.close();
 }
 
-/* Called after any successful sign-in, in every account mode. */
-async function onSignedIn(user) {
+function onAuthDialogClosed() {
+  setAuthMessage("");
+  $("#auth-password").value = "";
+  const reason = authReason;
+  authReason = "signin";
+  // Closing the dialog after a session expired keeps the work in this browser.
+  if (reason === "expired" && session.target === "expired") continueAsGuest();
+}
+
+function snapshotProject() {
+  return JSON.parse(JSON.stringify({ ...projectPayload(), saved_at: state.saved_at }));
+}
+
+function signInSummary(summary, combined) {
+  const where = session.target === "profile" ? "profile" : "account";
+  if (!combined) return `Your work from this browser is now saved to your ${where}.`;
+  const parts = [];
+  if (summary.answersAdded) parts.push(`${summary.answersAdded} answer${summary.answersAdded === 1 ? "" : "s"}`);
+  if (summary.ideasAdded) parts.push(`${summary.ideasAdded} idea${summary.ideasAdded === 1 ? "" : "s"}`);
+  if (summary.materialsAdded) parts.push(`${summary.materialsAdded} material${summary.materialsAdded === 1 ? "" : "s"}`);
+  let message = parts.length ? `Added your work from this browser to your ${where}: ${parts.join(", ")}.` : `Your ${where}'s project is open.`;
+  if (summary.answersKeptAsMaterial) {
+    const count = summary.answersKeptAsMaterial;
+    message += ` ${count} answer${count === 1 ? " differed" : "s differed"} from your ${where}'s, so ${count === 1 ? "it was" : "they were"} kept as material to review in the project overview.`;
+  }
+  return message;
+}
+
+/*
+ * Open `destination` (the account's or profile's project) and bring `carried`
+ * (work done without signing in) into it without losing anything.
+ */
+async function adoptWork(destination, carried) {
+  const base = destination || Logic.emptyProject();
+  if (!carried || !Logic.hasContent(carried)) {
+    replaceProject(base);
+    sync.dirty = false;
+    renderAll();
+    setStatus(savedLabel());
+    return;
+  }
+  const { project, summary } = Logic.mergeProjects(base, carried, questionBank);
+  const tooLarge = Logic.utf8Length(JSON.stringify(project)) > LIMITS.requestBytes;
+  if (Logic.validationError(project) || tooLarge) {
+    replaceProject(base);
+    sync.dirty = false;
+    renderAll();
+    setStatus(savedLabel());
+    toast("Your project is open. The work from this browser was kept separately here, because combining them would exceed the project limits.");
+    return;
+  }
+  replaceProject({ ...project, revision: base.revision || 0 });
+  sync.dirty = true;
+  renderAll();
+  if (await saveProject({ force: true })) {
+    try {
+      await deleteBrowserProject(GUEST_OWNER);
+    } catch (error) {
+      console.error(error);
+    }
+    toast(signInSummary(summary, Logic.hasContent(base)));
+  }
+}
+
+async function loadDestinationProject() {
+  if (session.mode === "indexeddb") return loadBrowserProject(session.staticUser.id);
+  return fetchJson("/api/project");
+}
+
+/* Bring work that an earlier visit saved without signing in into the current account or profile. */
+async function adoptStoredGuestWork() {
+  let stored = null;
+  try {
+    stored = await loadBrowserProject(GUEST_OWNER);
+  } catch {
+    return;
+  }
+  if (stored && Logic.hasContent(stored)) await adoptWork(snapshotProject(), stored);
+}
+
+/* Called once credentials are accepted, in every account mode. */
+async function completeSignIn(user) {
+  const priorTarget = session.target;
   const previous = session.user;
-  if (appLoaded && previous && user && previous.id && user.id && previous.id !== user.id) {
-    // A different person signed in on this page: start from a clean slate.
+  if (priorTarget === "expired" && previous && previous.id && user && user.id && previous.id !== user.id) {
+    // Someone else signed in on this page: don't mix their work with the previous person's.
     window.location.reload();
     return;
   }
-  session.user = { ...(previous || {}), ...(user || {}) };
+  // Make sure the latest work done without an account is stored before switching.
+  if (priorTarget === "guest") await saveProject();
+  const carried = (priorTarget === "guest" || priorTarget === "memory") && Logic.hasContent(state) ? snapshotProject() : null;
+  session.user = { ...(priorTarget === "expired" && previous ? previous : {}), ...(user || {}) };
+  session.target = session.mode === "indexeddb" ? "profile" : "account";
   if (session.mode !== "indexeddb") {
     try {
       await loadCurrentUser();
@@ -987,17 +1268,81 @@ async function onSignedIn(user) {
       console.error(error);
     }
   }
-  const authPageWasOpen = !$("#auth-page").hidden;
-  if (!appLoaded) {
-    await loadApplication();
-  } else if (authPageWasOpen) {
-    hideAuthPage();
-  }
-  if (sync.blocked && sync.blocked.kind === "auth") {
-    sync.blocked = null;
-    if (sync.dirty) await saveProject({ force: true });
-  }
+  clearTimeout(sync.timer);
+  sync.retryDelay = 0;
+  sync.blocked = null;
+  hideAuthPage();
   renderAccountControls();
+  if (priorTarget === "expired") {
+    // The same person signed in again: keep the unsaved work and save it.
+    if (sync.dirty) await saveProject({ force: true });
+    else setStatus(savedLabel());
+    return;
+  }
+  setStatus("Opening your project…", "pending");
+  let destination;
+  try {
+    destination = await loadDestinationProject();
+  } catch (error) {
+    console.error(error);
+    // Everything done so far is stored in this browser; a reload adopts it.
+    window.location.reload();
+    return;
+  }
+  await adoptWork(destination, carried);
+  renderAccountControls();
+}
+
+/* After a session expired, keep editing with the work stored in this browser. */
+async function continueAsGuest() {
+  session.token = "";
+  writeStorage(STORAGE_KEYS.token, null);
+  session.user = null;
+  session.target = "guest";
+  sync.blocked = null;
+  let stored = null;
+  try {
+    stored = await loadBrowserProject(GUEST_OWNER);
+  } catch (error) {
+    console.error(error);
+    session.target = "memory";
+  }
+  let project = snapshotProject();
+  if (stored && Logic.hasContent(stored)) project = Logic.mergeProjects(project, stored, questionBank).project;
+  replaceProject({ ...project, revision: stored ? stored.revision : 0 });
+  sync.dirty = true;
+  renderAll();
+  renderAccountControls();
+  if (session.target === "memory") {
+    blockStorage();
+    return;
+  }
+  if (await saveProject({ force: true })) {
+    toast("Your changes are saved in this browser. Sign in any time to move them to your account.");
+  }
+}
+
+function blockStorage() {
+  sync.blocked = { kind: "storage", message: "Storage blocked" };
+  setStatus("Not saved — this browser blocks storage", "error");
+  toast(session.mode === "indexeddb"
+    ? "This browser is blocking site storage, so your work can't be kept. Allow site data for this page, or export your plan before leaving."
+    : "This browser is blocking site storage, so your work can't be kept here. Sign in to save it to an account, or export your plan before leaving.");
+}
+
+function maybeOfferSignIn() {
+  if (session.target !== "guest" || !accountsEnabled() || !Logic.hasContent(state)) return;
+  const dismissedAt = Number(readStorage(STORAGE_KEYS.promptDismissed) || 0);
+  if (dismissedAt && Date.now() - dismissedAt < PROMPT_DISMISS_DAYS * 86400000) return;
+  const browserOnly = session.mode === "indexeddb";
+  $("#account-prompt-text").textContent = browserOnly ? PROMPT_COPY.indexeddb : PROMPT_COPY.account;
+  $("#account-prompt-signin").textContent = browserOnly ? "Create a profile" : "Sign in to save it";
+  $("#account-prompt").hidden = false;
+}
+
+function dismissAccountPrompt() {
+  $("#account-prompt").hidden = true;
+  writeStorage(STORAGE_KEYS.promptDismissed, String(Date.now()));
 }
 
 async function loadCurrentUser() {
@@ -1033,6 +1378,12 @@ async function builtinAuth(path, { email, password }) {
   return result.user;
 }
 
+function supabaseUnavailable() {
+  if (session.mode !== "supabase" || session.supabase) return false;
+  setAuthMessage("Sign-in is unavailable right now because the authentication library could not be loaded. Your work is still saved in this browser.", true);
+  return true;
+}
+
 async function handleSignIn(event) {
   event.preventDefault();
   const { email, password } = credentials();
@@ -1040,13 +1391,13 @@ async function handleSignIn(event) {
     setAuthMessage("Enter your email and a password of at least 8 characters.", true);
     return;
   }
+  if (supabaseUnavailable()) return;
   setAuthMessage("Signing in…");
   try {
     if (session.mode === "indexeddb") {
-      const user = await staticLogin(email, password);
-      await startStaticSession(user);
+      await startProfileSession(await staticLogin(email, password));
     } else if (session.mode === "builtin") {
-      await onSignedIn(await builtinAuth("/api/auth/login", { email, password }));
+      await completeSignIn(await builtinAuth("/api/auth/login", { email, password }));
     } else if (session.mode === "supabase") {
       const { error } = await session.supabase.auth.signInWithPassword({ email, password });
       if (error) setAuthMessage(error.message, true);
@@ -1062,18 +1413,16 @@ async function handleRegister() {
     setAuthMessage("Enter an email and a password of at least 8 characters.", true);
     return;
   }
+  if (supabaseUnavailable()) return;
   setAuthMessage("Creating your account…");
   try {
     if (session.mode === "indexeddb") {
-      const user = await staticRegister(email, password);
-      await startStaticSession(user);
-      toast("Profile created in this browser.");
+      await startProfileSession(await staticRegister(email, password));
     } else if (session.mode === "builtin") {
-      await onSignedIn(await builtinAuth("/api/auth/register", { email, password }));
-      toast("Account created and signed in.");
+      await completeSignIn(await builtinAuth("/api/auth/register", { email, password }));
     } else if (session.mode === "supabase") {
       const { error } = await session.supabase.auth.signUp({ email, password, options: { emailRedirectTo: session.authRedirectUrl } });
-      setAuthMessage(error ? error.message : "Account created. Check your email to confirm it.", Boolean(error));
+      setAuthMessage(error ? error.message : "Account created. Check your email to confirm it, then sign in. Your work stays saved in this browser meanwhile.", Boolean(error));
     }
   } catch (error) {
     setAuthMessage(error.message || "Could not create the account.", true);
@@ -1086,15 +1435,19 @@ async function handleMagicLink() {
     setAuthMessage("Enter your email first.", true);
     return;
   }
+  if (supabaseUnavailable()) return;
   try {
     const { error } = await session.supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: session.authRedirectUrl } });
-    setAuthMessage(error ? error.message : "Magic link sent. Check your email.", Boolean(error));
+    setAuthMessage(error ? error.message : "Magic link sent. Check your email; your work stays saved in this browser.", Boolean(error));
   } catch (error) {
     setAuthMessage(error.message || "Could not send the magic link.", true);
   }
 }
 
 async function handleOAuth(button) {
+  if (supabaseUnavailable()) return;
+  // Store the latest work first: the provider's sign-in page replaces this one.
+  await saveProject();
   setAuthMessage(`Opening ${button.textContent.trim()} sign-in…`);
   try {
     const { error } = await session.supabase.auth.signInWithOAuth({
@@ -1124,12 +1477,13 @@ async function signOut() {
   }
   writeStorage(STORAGE_KEYS.token, null);
   writeStorage(STORAGE_KEYS.staticEmail, null);
-  // Reloading clears this person's project from memory and from the page.
+  // Reloading removes this person's project from the page; the next visitor starts fresh.
   window.location.reload();
 }
 
 // ---------------------------------------------------------------------------
-// Browser-only profiles (static hosting such as GitHub Pages)
+// Browser storage (IndexedDB): projects of visitors who have not signed in,
+// and the browser-only profiles of the static demo.
 // ---------------------------------------------------------------------------
 
 function openStaticAuthDatabase() {
@@ -1215,21 +1569,24 @@ async function loadStaticAuthSession() {
   return user || null;
 }
 
-async function loadStaticProject(ownerId) {
+async function loadBrowserProject(ownerId) {
   const record = await withStaticDatabase((database) => staticDatabaseRequest(database, "projects", "readonly", (store) => store.get(ownerId)));
   if (!record) return null;
   return { ...record.data, revision: record.revision || 1, saved_at: record.updatedAt || null };
 }
 
-/* Store the project in IndexedDB, refusing the write if another tab saved first. */
-async function saveStaticProject(project) {
-  if (!session.staticUser) throw new Error("No profile is signed in.");
-  const owner = session.staticUser;
+async function deleteBrowserProject(ownerId) {
+  await withStaticDatabase((database) => staticDatabaseRequest(database, "projects", "readwrite", (store) => store.delete(ownerId)));
+}
+
+/* Store a project in IndexedDB, refusing the write if another tab saved first. */
+async function saveBrowserProject(ownerId, project) {
+  const email = session.staticUser && session.staticUser.id === ownerId ? session.staticUser.email : null;
   return withStaticDatabase((database) => new Promise((resolve, reject) => {
     const transaction = database.transaction("projects", "readwrite");
     const store = transaction.objectStore("projects");
     let saved = null;
-    const read = store.get(owner.id);
+    const read = store.get(ownerId);
     read.onsuccess = () => {
       const existing = read.result;
       const currentRevision = existing ? existing.revision || 1 : 0;
@@ -1244,7 +1601,7 @@ async function saveStaticProject(project) {
       delete data.saved_at;
       const updatedAt = new Date().toISOString();
       saved = { ...data, revision: currentRevision + 1, saved_at: updatedAt };
-      store.put({ ownerId: owner.id, email: owner.email, data, revision: currentRevision + 1, updatedAt });
+      store.put({ ownerId, email, data, revision: currentRevision + 1, updatedAt });
     };
     transaction.oncomplete = () => resolve(saved);
     transaction.onerror = () => reject(transaction.error);
@@ -1252,11 +1609,10 @@ async function saveStaticProject(project) {
 }
 
 /*
- * Before profiles existed, the demo kept one project in localStorage. Give it
- * to the first profile that signs in without a project of its own, and keep a
- * copy so nothing is lost if something goes wrong.
+ * The first version of the demo kept one project in localStorage. It becomes
+ * the project of a visitor who has not signed in (a backup copy is kept).
  */
-async function migrateLegacyProject() {
+async function importLegacyIntoGuest() {
   const legacy = readStorage(STORAGE_KEYS.legacyProject);
   if (!legacy) return null;
   let project;
@@ -1267,25 +1623,10 @@ async function migrateLegacyProject() {
   }
   if (!project || typeof project !== "object") return null;
   replaceProject({ ...project, revision: 0 });
-  const saved = await saveStaticProject(projectPayload());
+  const saved = await saveBrowserProject(GUEST_OWNER, projectPayload());
   writeStorage(STORAGE_KEYS.migratedProject, legacy);
   writeStorage(STORAGE_KEYS.legacyProject, null);
   return saved;
-}
-
-async function startStaticSession(user) {
-  session.staticUser = user;
-  session.user = { id: user.id, email: user.email };
-  writeStorage(STORAGE_KEYS.staticEmail, user.email);
-  let project = await loadStaticProject(user.id);
-  let migrated = false;
-  if (!project) {
-    project = await migrateLegacyProject();
-    migrated = Boolean(project);
-  }
-  replaceProject(project || Logic.emptyProject());
-  await onSignedIn(session.user);
-  if (migrated) toast("Restored the project you started in this browser earlier.");
 }
 
 // ---------------------------------------------------------------------------
@@ -1312,7 +1653,7 @@ async function fetchJson(url) {
 
 let applicationLoading = null;
 
-/* Load questions, stages, and (in server modes) the project, then render. */
+/* Load questions, stages, and (for accounts and the local server) the project, then render. */
 function loadApplication() {
   if (!applicationLoading) {
     applicationLoading = loadApplicationOnce().finally(() => { applicationLoading = null; });
@@ -1322,34 +1663,22 @@ function loadApplication() {
 
 async function loadApplicationOnce() {
   if (appLoaded) return;
-  try {
-    const staticFiles = session.mode === "indexeddb";
-    const [questions, stageList, project] = await Promise.all([
-      fetchJson(staticFiles ? "./questions.json" : "/api/questions"),
-      fetchJson(staticFiles ? "./stages.json" : "/api/stages"),
-      staticFiles ? Promise.resolve(null) : fetchJson("/api/project"),
-    ]);
-    questionBank = questions;
-    stages = stageList;
-    if (project) replaceProject(project);
-    appLoaded = true;
-    sync.dirty = false;
-    activeStage = -1;
-    $("#auth-page").hidden = true;
-    renderAll();
-    renderAccountControls();
-    setStatus(savedLabel());
-  } catch (error) {
-    console.error(error);
-    if (error.status === 401 && accountsEnabled()) {
-      session.token = "";
-      writeStorage(STORAGE_KEYS.token, null);
-      showAuthPage("Your session has expired. Please log in again.", { error: true });
-      return;
-    }
-    setStatus("Could not load project", "error");
-    toast("The project could not be loaded. Check your connection and refresh the page.");
-  }
+  const staticFiles = session.mode === "indexeddb";
+  const fromServer = session.target === "account" || session.target === "local";
+  const [questions, stageList, project] = await Promise.all([
+    fetchJson(staticFiles ? "./questions.json" : "/api/questions"),
+    fetchJson(staticFiles ? "./stages.json" : "/api/stages"),
+    fromServer ? fetchJson("/api/project") : Promise.resolve(null),
+  ]);
+  questionBank = questions;
+  stages = stageList;
+  if (project) replaceProject(project);
+  appLoaded = true;
+  sync.dirty = false;
+  activeStage = -1;
+  renderAll();
+  renderAccountControls();
+  setStatus(savedLabel());
 }
 
 async function detectMode() {
@@ -1372,10 +1701,57 @@ async function detectMode() {
   return { mode, config };
 }
 
+/* Not signed in: plan right away, with the project kept in this browser. */
+async function startGuestSession(notice) {
+  session.target = "guest";
+  let project = null;
+  try {
+    project = (await loadBrowserProject(GUEST_OWNER)) || (await importLegacyIntoGuest());
+  } catch (error) {
+    console.error(error);
+    session.target = "memory";
+  }
+  replaceProject(project || Logic.emptyProject());
+  await loadApplication();
+  if (session.target === "memory") blockStorage();
+  else if (notice) toast(notice);
+}
+
+async function startAccountSession() {
+  session.target = "account";
+  try {
+    await loadApplication();
+  } catch (error) {
+    if (error.status !== 401) throw error;
+    session.token = "";
+    writeStorage(STORAGE_KEYS.token, null);
+    await startGuestSession("Your session expired, so you're working without signing in. Sign in to open your account's project.");
+    return;
+  }
+  await adoptStoredGuestWork();
+  renderAccountControls();
+}
+
+/* A browser-only profile (static demo): at start-up, or right after signing in. */
+async function startProfileSession(user, { atStartup = false } = {}) {
+  session.staticUser = user;
+  writeStorage(STORAGE_KEYS.staticEmail, user.email);
+  if (!atStartup) {
+    await completeSignIn({ id: user.id, email: user.email });
+    return;
+  }
+  session.target = "profile";
+  session.user = { id: user.id, email: user.email };
+  replaceProject((await loadBrowserProject(user.id)) || Logic.emptyProject());
+  await loadApplication();
+  await adoptStoredGuestWork();
+  renderAccountControls();
+}
+
 async function initializeBuiltin() {
   session.token = readStorage(STORAGE_KEYS.token) || "";
   if (!session.token) {
-    showAuthPage("Log in or create an account to start planning.");
+    await startGuestSession();
     return;
   }
   try {
@@ -1384,15 +1760,14 @@ async function initializeBuiltin() {
     if (error.status === 401) {
       session.token = "";
       writeStorage(STORAGE_KEYS.token, null);
-      showAuthPage("Your session has expired. Please log in again.", { error: true });
+      await startGuestSession("Your session expired, so you're working without signing in. Sign in to open your account's project.");
     } else {
       setStatus("Server unavailable", "error");
       toast("Your account could not be checked right now. Refresh the page in a moment.");
     }
     return;
   }
-  await loadApplication();
-  renderAccountControls();
+  await startAccountSession();
 }
 
 async function initializeSupabase(config) {
@@ -1404,8 +1779,9 @@ async function initializeSupabase(config) {
   try {
     if (!window.supabase) await loadScript(SUPABASE_SDK);
   } catch (error) {
+    // Planning still works; signing in waits until the library can load.
     console.error(error);
-    showAuthPage("Sign-in is unavailable because the authentication library could not be loaded. Check your connection and refresh.", { error: true });
+    await startGuestSession();
     return;
   }
   session.supabase = window.supabase.createClient(config.supabase_url, config.supabase_anon_key, {
@@ -1416,19 +1792,20 @@ async function initializeSupabase(config) {
   session.supabase.auth.onAuthStateChange((event, authSession) => {
     session.token = (authSession && authSession.access_token) || "";
     if (event === "SIGNED_OUT") {
-      if (appLoaded) window.location.reload();
+      if (appLoaded && isSignedIn()) window.location.reload();
       return;
     }
-    if (authSession && event === "SIGNED_IN") {
+    if (authSession && event === "SIGNED_IN" && !isSignedIn() && appLoaded) {
       // Defer so Supabase finishes its own bookkeeping before we call the API.
-      setTimeout(() => onSignedIn({ id: authSession.user.id, email: authSession.user.email }), 0);
+      setTimeout(() => completeSignIn({ id: authSession.user.id, email: authSession.user.email }), 0);
     }
   });
   if (!session.token) {
-    showAuthPage("Log in or create an account to start planning.");
+    await startGuestSession();
     return;
   }
-  await onSignedIn({ id: data.session.user.id, email: data.session.user.email });
+  session.user = { id: data.session.user.id, email: data.session.user.email };
+  await startAccountSession();
 }
 
 async function initializeStatic() {
@@ -1438,23 +1815,13 @@ async function initializeStatic() {
     user = await loadStaticAuthSession();
   } catch (error) {
     console.error(error);
-    showAuthPage("This browser is blocking local storage, so the demo cannot keep your work. Allow site data for this page and refresh.", { error: true });
-    return;
   }
-  if (!user) {
-    showAuthPage("Create a local profile or log in to start planning.");
-    return;
-  }
-  try {
-    await startStaticSession(user);
-  } catch (error) {
-    console.error(error);
-    setStatus("Could not load project", "error");
-    toast("The project stored in this browser could not be loaded.");
-  }
+  if (user) await startProfileSession(user, { atStartup: true });
+  else await startGuestSession();
 }
 
 function bindUi() {
+  renderStatusLegend();
   $("#project-title").addEventListener("input", () => {
     state.title = $("#project-title").value;
     markDirty();
@@ -1506,17 +1873,20 @@ function bindUi() {
   });
   $("#previous-stage").addEventListener("click", () => showStage(Math.max(0, activeStage - 1)));
   $("#next-stage").addEventListener("click", () => (activeStage === stages.length - 1 ? showInbox() : showStage(activeStage + 1)));
-  document.querySelectorAll("[data-open-stage]").forEach((button) => {
-    button.addEventListener("click", () => showStage(stages.findIndex((stage) => stage.title === button.dataset.openStage)));
-  });
+  $("#continue-planning").addEventListener("click", continuePlanning);
+  $("#stage-readiness-link").addEventListener("click", () => showOverview({ focusReadiness: true }));
   $("#conflict-load").addEventListener("click", () => resolveConflict(false));
   $("#conflict-keep").addEventListener("click", () => resolveConflict(true));
 
-  $("#login-button").addEventListener("click", () => showAuthPage("Enter your email and password to log in."));
-  $("#register-button").addEventListener("click", () => showAuthPage("Choose an email and a password of at least 8 characters, then select Create account."));
+  $("#login-button").addEventListener("click", () => showAuthPage(""));
+  $("#account-prompt-signin").addEventListener("click", () => showAuthPage(""));
+  $("#account-prompt-dismiss").addEventListener("click", dismissAccountPrompt);
   $("#auth-form").addEventListener("submit", handleSignIn);
   $("#sign-up").addEventListener("click", handleRegister);
   $("#magic-link").addEventListener("click", handleMagicLink);
+  $("#auth-continue").addEventListener("click", hideAuthPage);
+  $("#auth-close").addEventListener("click", hideAuthPage);
+  $("#auth-dialog").addEventListener("close", onAuthDialogClosed);
   document.querySelectorAll("[data-provider]").forEach((button) => button.addEventListener("click", () => handleOAuth(button)));
   $("#sign-out").addEventListener("click", signOut);
 
@@ -1548,11 +1918,14 @@ async function initialize() {
     if (mode === "indexeddb") await initializeStatic();
     else if (mode === "builtin") await initializeBuiltin();
     else if (mode === "supabase") await initializeSupabase(config);
-    else await loadApplication();
+    else {
+      session.target = "local";
+      await loadApplication();
+    }
   } catch (error) {
     console.error(error);
-    setStatus("Could not start", "error");
-    toast("The application could not be initialized. Refresh the page to try again.");
+    setStatus("Could not load project", "error");
+    toast("The project could not be loaded. Check your connection and refresh the page.");
   }
 }
 

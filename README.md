@@ -19,10 +19,13 @@ Move through ten connected stages instead of facing a blank outline:
 9. Scenes and chapters
 10. Continuity and drafting readiness
 
-Every stage includes a purpose, exercise, useful output, completion standard, decision check, and common pitfalls.
+Every stage includes a purpose, exercise, useful output, completion standard, decision check, common pitfalls, and the craft sources it draws on. Every question explains what it asks and why, how to approach it, what a strong answer looks like, a common weak answer and how to improve it, and what it connects to; many include an example and a fillable worksheet. Later questions show what you already decided for the questions they build on, and each stage shows the notes from your idea inbox filed under it.
+
+The planner follows `readme.txt` as its blueprint: the five planning statuses (essential, important, optional, deferred, intentionally unknown) are explained in the app, and the project overview and every export end with a **Ready to Write Chapter One?** assessment and a pre-drafting checklist, built only from your own decisions.
 
 ## Built for the messy beginning
 
+- **Start right away**: no account needed. Your work is saved in this browser, and you can sign in whenever you like; everything you wrote comes with you
 - **Capture ideas quickly** in a categorized idea inbox, and re-file them later
 - **Import existing notes** from one or more `.txt` or Markdown files (long files are split into parts)
 - **Keep source material intact** without accidentally turning it into a final decision
@@ -31,24 +34,24 @@ Every stage includes a purpose, exercise, useful output, completion standard, de
 - **Search your project** across planning answers, ideas, and source material, and jump back to any answer
 - **Watch your progress** as essential decisions become settled (deferring or downgrading a decision removes it from the target)
 - **Export a blueprint** as Markdown or PDF (PDF exports keep Chinese, Japanese, Korean, Cyrillic, and Greek text)
-- **Choose a comfortable theme**: dark, light, or warm paper
+- **Choose a comfortable look**: Dark mode, Bright mode, or Parchment mode (warm, textured like old sheepskin parchment)
 - **Never lose work silently**: autosave with retries, a warning before closing with unsaved changes, and a conflict prompt when the same project was changed in another tab or device
 
 ## Three ways to run it
 
 | | Where projects are stored | Accounts | Use it for |
 |---|---|---|---|
-| [Live demo](https://jonathanjiwu.github.io/novel_planner/) (GitHub Pages) | This browser only (IndexedDB) | Local profiles in this browser | Trying the planner |
+| [Live demo](https://jonathanjiwu.github.io/novel_planner/) (GitHub Pages) | This browser only (IndexedDB) | Optional local profiles in this browser | Trying the planner |
 | `python web_app.py` | `novel_project.json` on your computer | None (single user) | Personal use on your own machine |
-| `uvicorn app:app` | SQLite database, or Supabase | Real accounts | Anything shared or used across devices |
+| `uvicorn app:app` | Your account (SQLite or Supabase); this browser until you sign in | Optional real accounts | Anything shared or used across devices |
 
 ### Live demo (GitHub Pages)
 
 **Live website: [https://jonathanjiwu.github.io/novel_planner/](https://jonathanjiwu.github.io/novel_planner/)**
 
-The demo has no server. "Accounts" there are local profiles: the profile and its project stay in the browser where they were created, are not available on other devices, and are deleted if the site's data is cleared. Export your plan regularly. **Print or save as PDF** opens the browser's print dialog with a print-ready version of the plan.
+Anyone can start planning immediately; the project is saved in this browser. The demo has no server, so its optional profiles are local too: they keep separate projects for different people using the same browser, don't sync to other devices, and are deleted if the site's data is cleared. Export your plan regularly. **Print or save as PDF** opens the browser's print dialog with a print-ready version of the plan.
 
-Projects started in the demo before profiles existed are moved into the first profile that signs in on that browser (a backup copy stays in the browser's storage).
+Projects saved by the first version of the demo are restored automatically (a backup copy stays in the browser's storage).
 
 Publishing: pushes to `main` run [`deploy.yml`](.github/workflows/deploy.yml), which runs the full test suite, builds the static site, deploys it to GitHub Pages, and smoke-tests the live URL. (Repository **Settings › Pages › Build and deployment** must be set to **GitHub Actions**.)
 
@@ -69,6 +72,8 @@ AUTH_REQUIRED=true python -m uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
 With no Supabase settings, accounts and projects are stored in SQLite at `NOVEL_PLANNER_DB` (default `novel_planner.db` in the project folder). See [`.env.example`](.env.example) for every setting.
+
+Signing in is optional. Visitors plan right away with their project kept in their own browser, and the app offers sign-in at natural moments (after their first saved work, or after an export) without interrupting them. When they sign in, their work moves into the account: blank answers are filled, nothing in the account is overwritten, and any answer that differs is kept as tentative material to review. Visitors can also export; the server renders the project they send without storing it (rate-limited). `AUTH_REQUIRED=true` means the server stores projects only for signed-in accounts.
 
 - Passwords are hashed with scrypt; sessions are signed tokens that can be revoked (signing out ends the session on the server).
 - Failed logins and registrations are rate-limited.

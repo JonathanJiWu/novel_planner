@@ -45,6 +45,7 @@ def configure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callable[..., 
             app_module.login_failures_per_account,
             app_module.login_failures_per_client,
             app_module.registrations_per_client,
+            app_module.exports_per_client,
         ):
             limiter.clear()
         return settings

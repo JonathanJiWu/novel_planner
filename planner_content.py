@@ -142,12 +142,16 @@ def build_planning_stages() -> list[dict[str, str]]:
         "title", "label", "intro", "purpose", "why", "method", "exercise",
         "criteria", "watch_for", "output", "completion",
     )
-    return [dict(zip(keys, row)) for row in _STAGE_GUIDES]
+    stages = [dict(zip(keys, row)) for row in _STAGE_GUIDES]
+    for stage in stages:
+        stage["sources"] = _STAGE_SOURCES[stage["title"]]
+        stage["dimension"] = _STAGE_DIMENSIONS[stage["title"]]
+    return stages
 
 
 _QUESTION_DATA = [
-    ("story_seed", "Stage A — Story Identity", "What first image, question, character, situation, or contradiction made you want to write this novel?", "Start with the raw impulse, not a polished pitch.", "Keeping the original spark visible helps later decisions stay distinctive.", "Write fragments if that is all you have. What keeps returning to your attention?", "important", False, ""),
-    ("story_identity", "Stage A — Story Identity", "What is happening in this story, and what makes it matter to you?", "A working story statement joins a situation with its personal or larger significance.", "This becomes the anchor for choices about plot, character, and scope.", "Try: someone wants something, but a specific pressure makes the pursuit consequential. Add why you want to tell it.", "essential", True, "Plot, character, and scope."),
+    ("story_seed", "Stage A — Story Identity", "What first image, question, character, situation, or contradiction made you want to write this novel?", "Start with the raw impulse, not a polished pitch.", "Keeping the original spark visible helps later decisions stay distinctive.", "Write fragments if that is all you have. What keeps returning to your attention?", "important", False, "Story identity, distinctiveness, and theme."),
+    ("story_identity", "Stage A — Story Identity", "What is happening in this story, and what makes it matter to you?", "A working story statement joins a situation with its personal or larger significance.", "This becomes the anchor for choices about plot, character, and scope.", "Try: someone wants something, but a specific pressure makes the pursuit consequential. Add why you want to tell it, and a working sense of genre, scope, and ambition (Stage B refines them).", "essential", True, "Plot, character, and scope."),
     ("dramatic_interest", "Stage A — Story Identity", "What is the story’s strongest source of dramatic interest, and what makes this version distinct?", "The tension, dilemma, mystery, collision, or transformation that creates forward pull.", "A distinctive engine gives readers a reason to choose this story over a familiar premise.", "What can happen here that could not happen in quite the same way elsewhere? What question makes you want to know what happens next?", "essential", True, "Reader promise, central conflict, and opening."),
     ("creative_intent", "Stage A — Story Identity", "What do you hope the story explores or leaves with readers, and what might it actually make them feel or think?", "Separate intention from likely reader experience; the two may not fully match.", "The difference can reveal an opportunity or a mismatch to revisit.", "Name a question or tension rather than prescribing a lesson. What evidence in the story could lead a reader somewhere unexpected?", "important", False, "Theme, tone, and reader promise."),
 
@@ -161,7 +165,8 @@ _QUESTION_DATA = [
     ("narrative_voice", "Stage C — Tone, Voice & Style", "Who tells the story, how reliable or limited are they, and what can this voice know or reveal?", "Voice includes the narrator’s relationship to events and limits of knowledge.", "Voice controls intimacy, trust, and timing of information.", "Note person, reliability, intimacy, authority, and what remains outside the narrator’s knowledge.", "important", False, "Information flow and reader trust."),
     ("point_of_view", "Stage C — Tone, Voice & Style", "Whose viewpoint will readers inhabit, how close will narration stay, and what rules govern viewpoint changes?", "Point of view defines access to perception, thought, and information.", "Clear viewpoint rules prevent accidental shifts and help manage suspense.", "List viewpoint characters if there are several, when a switch is allowed, and how close or distant the prose should feel.", "essential", True, "Scene plan, cast, and information control."),
     ("style_charter", "Stage C — Tone, Voice & Style", "What should the prose sound like in rhythm, diction, description, imagery, dialogue, interiority, and exposition?", "A practical style charter turns a general mood into choices a writer can apply.", "Specific stylistic principles are easier to maintain and revise than adjectives alone.", "Describe sentence rhythm, vocabulary, detail level, lyricism, figurative language, dialogue, humor, and exposition. Add a brief original demonstration if useful.", "essential", True, "Every scene and revision."),
-    ("style_guardrails", "Stage C — Tone, Voice & Style", "What stylistic habits should the draft avoid, and how will you keep tonal contrasts intentional?", "Guardrails are cautions, not absolute bans on techniques.", "They help preserve a coherent experience across humor, grief, action, tenderness, and suspense.", "Identify a few risks to watch for and situations where deliberate contrast would work.", "important", False, "Style charter and revision checklist."),
+    ("style_samples", "Stage C — Tone, Voice & Style", "Optional: can you write a short original passage that demonstrates the intended style?", "A sample passage shows the charter in action. Label it as an example, not prose the manuscript must use.", "A concrete demonstration is easier to match while drafting than a description of style.", "Write a neutral moment in the intended voice, or the same moment twice—once in a voice you reject—and note what the contrast shows.", "optional", False, "Style charter and revision."),
+    ("style_guardrails", "Stage C — Tone, Voice & Style", "What stylistic habits should the draft avoid, and how will you keep tonal contrasts intentional?", "Guardrails are cautions, not absolute bans on techniques.", "They help preserve a coherent experience across humor, grief, action, tenderness, and suspense.", "Name the risks that matter for this book—unwanted melodrama, sentimentality, excessive exposition, melodramatic dialogue, artificial profundity, purple prose—and where tonal contrast (humor in grief, tenderness in violence) is intended.", "important", False, "Style charter and revision checklist."),
 
     ("core_theme", "Stage D — Theme", "What central question, tension, or contradiction does the story put under pressure?", "A theme is more useful as a live question than as a lesson to prove.", "This keeps meaning open to exploration rather than turning characters into mouthpieces.", "Phrase it as a difficult question or competing truths. What makes neither side easy to dismiss?", "essential", True, "Character choices, conflict, and ending."),
     ("thematic_positions", "Stage D — Theme", "What different values or beliefs will characters embody, and what does each position get right or wrong?", "Thematic architecture emerges through credible competing perspectives.", "It gives the story complexity and prevents the author’s view from being mistaken for every character’s view.", "Name central and secondary questions, the strongest opposing beliefs, and who holds them.", "important", False, "Character design and conflict."),
@@ -198,7 +203,7 @@ _QUESTION_DATA = [
     ("consistency_rules", "Stage J — Continuity & Readiness", "Which secrets, reveals, recurring details, or promises need setup and payoff—and what should remain unresolved?", "Track information flow and intentional ambiguity separately from accidental omissions.", "This helps revelations feel fair and mysteries remain purposeful.", "List key setups, planned reveals, who knows what and when, and deliberate open questions.", "important", False, "Plot, viewpoint, and reader trust."),
     ("quality_standards", "Stage J — Continuity & Readiness", "What few standards will you use to check plot coherence, character consistency, voice, clarity, pacing, and thematic integration?", "Standards translate intentions into practical drafting checks.", "A small tailored checklist is more useful than a generic perfection test.", "Write observable checks that fit this novel, including viewpoint, style, and continuity conventions.", "important", False, "Drafting and revision."),
     ("deferred_decisions", "Stage J — Continuity & Readiness", "Which questions are safe to defer, which should stay intentionally unknown, and which must be resolved before drafting?", "Uncertainty can be a creative choice, a harmless gap, or a genuine risk.", "Explicit categories keep blanks from becoming accidental decisions or unnecessary blockers.", "Separate author-known/reader-unknown mysteries from undecided items. Mark provisional choices and note what evidence would change them.", "important", False, "Readiness assessment."),
-    ("readiness_assessment", "Stage J — Continuity & Readiness", "What is solid enough to draft, what remains uncertain, and which uncertainties are harmless versus genuine risks?", "Readiness is a reasoned judgment, not a demand for a complete outline.", "Separating manageable discovery from structural risk helps you begin without false certainty.", "List strengths, open questions, risks to address first, what can be discovered in scenes, and a next step for Chapter One.", "essential", True, ""),
+    ("readiness_assessment", "Stage J — Continuity & Readiness", "What is solid enough to draft, what remains uncertain, and which uncertainties are harmless versus genuine risks?", "Readiness is a reasoned judgment, not a demand for a complete outline.", "Separating manageable discovery from structural risk helps you begin without false certainty.", "List strengths, open questions, risks to address first, what can be discovered in scenes, and a next step for Chapter One.", "essential", True, "Opening chapter and the drafting plan."),
 ]
 
 
@@ -209,6 +214,7 @@ _QUESTION_DEPENDENCIES = {
     "narrative_voice": ("reading_experience",),
     "point_of_view": ("narrative_voice",),
     "style_charter": ("tone_atmosphere", "point_of_view"),
+    "style_samples": ("style_charter",),
     "core_theme": ("story_identity",),
     "thematic_positions": ("core_theme",),
     "theme_in_action": ("core_theme", "thematic_positions"),
@@ -250,6 +256,172 @@ _QUESTION_EXAMPLES = {
     "speculative_rules": "A device can preserve a memory but cannot restore what was forgotten; each use consumes a scarce material controlled by the city.",
     "causal_chain": "Because the witness disappears, the protagonist breaks into the registry; that exposes her identity, prompting the opposition to close the route she needs.",
     "opening_chapter": "Readers meet the viewpoint character during a consequential choice, sense the novel’s tone, and leave with a specific question the next scene can pursue.",
+    "genre": "Primary: literary mystery. Secondary: family saga. Honor the fair-play clue trail; bend the detective role by giving it to a reluctant witness; refuse a tidy final confession.",
+    "tone_atmosphere": "Wry and intimate at first, darkening into dread after the midpoint; grief is allowed, sentimentality is not.",
+    "style_charter": "Short declarative sentences in action, longer ones in memory; concrete nouns over abstractions; dialogue carries subtext and almost no tags beyond “said.”",
+    "core_theme": "Is loyalty to family worth the truth it requires you to bury?",
+    "character_change": "Starts believing control keeps her safe; losing the archive forces her to depend on strangers; ends choosing trust, at a real cost.",
+    "central_conflict": "A ferry pilot must find her missing brother before the river authority closes the border; failure means he is declared dead and their family loses its license.",
+    "subplots": "A rivalry with the pilot’s apprentice: it tests the theme of loyalty and delivers the clue that breaks the main mystery.",
+    "scene_architecture": "Objective: get the ledger. Resistance: the clerk stalls. Turn: the ledger is already gone. Consequence: she must lie to her brother.",
+    "continuity_ledger": "A simple table in a notebook: dates, ages, travel times between towns, and which characters know about the forged map.",
+    "deferred_decisions": "Resolve now: who sent the letter. Monitor: the subplot’s ending. Discover in drafting: secondary names. Intentionally unknown: whether the ghost is real.",
+}
+
+
+# What a strong or useful answer looks like (readme §5), per question.
+_QUESTION_STRONG = {
+    "story_seed": "Names the specific image, question, or situation that keeps pulling you back, in your own words—fragments are fine.",
+    "story_identity": "Joins a specific situation (someone, a pressure, a consequence) with why it matters, in a sentence or two you can test later decisions against.",
+    "dramatic_interest": "Points to the tension or question that creates forward pull, and to what makes this version different from familiar ones.",
+    "creative_intent": "Separates what you hope the story does from what readers will likely experience, and notes any gap worth watching.",
+    "target_audience": "Describes a recognizable reader, the book’s scale (cast, timeline, complexity), and how much the reader is asked to carry.",
+    "genre": "Names a primary genre and influences, plus the specific conventions you will honor, bend, or subvert.",
+    "reading_experience": "Says what readers will feel, wonder, and anticipate across the book—what the opening promises and the ending delivers.",
+    "promise_tradeoffs": "Identifies one or two real tensions between your intent and reader expectations, and the trade-off you choose, with a reason.",
+    "tone_atmosphere": "Names a precise dominant tone, its allowed emotional range, and where and why it shifts.",
+    "atmosphere": "Lists specific recurring sensory details and how they change between places or stages of the story.",
+    "narrative_voice": "Defines who narrates, their relationship to events, how reliable they are, and what they cannot know.",
+    "point_of_view": "Names the viewpoint characters, the narrative distance, and a clear rule for when the viewpoint may change.",
+    "style_charter": "Gives observable prose choices—rhythm, diction, detail, imagery, dialogue, interiority, exposition—that you could check in a draft.",
+    "style_samples": "A short original passage, clearly labeled as an example, that shows the charter’s choices in action.",
+    "style_guardrails": "Names a few specific risks to watch for and where deliberate tonal contrast is allowed.",
+    "core_theme": "Phrases the theme as a difficult question or tension with credible competing answers.",
+    "thematic_positions": "Gives competing beliefs to specific characters and says what each position gets right and wrong.",
+    "theme_in_action": "Links the theme to specific choices, costs, and consequences, and notes how its meaning may shift.",
+    "protagonist": "Connects a present want to a deeper need or belief, with the history and limits that explain the choices the plot requires.",
+    "character_change": "Traces a starting belief or strategy, the pressures that test it, and what changing—or refusing to change—costs.",
+    "antagonist": "Gives the opposition its own goal, reasoning, and resources, so it acts rather than merely blocks.",
+    "cast_relationships": "Covers only characters with a story function: what each wants, their leverage, and their tie to the protagonist.",
+    "character_tests": "Points to concrete moments that show agency, consequence, distinct voices, and earned change.",
+    "world_system": "Describes the parts of time, place, history, and daily life that change what characters can do.",
+    "social_systems": "Identifies who holds power, which rules constrain people, and which systems are out of scope.",
+    "speculative_rules": "States what each rule allows, forbids, and costs, and at least one consequence beyond its first convenient use.",
+    "reader_world_knowledge": "Sorts crucial facts by who knows them and when readers learn them.",
+    "central_conflict": "States the goal, the opposition, the stakes, and the dramatic question in a way that can drive the whole book.",
+    "inciting_pressure": "Names the specific event and why this protagonist cannot ignore it.",
+    "plot_architecture": "Sketches the major turns and explains why this shape fits this story.",
+    "causal_chain": "Links each major event to the next with because/therefore, including the opposition’s countermoves.",
+    "climax_resolution": "Shows the climactic choice growing out of earlier decisions, and what the ending resolves or leaves open on purpose.",
+    "plot_diagnostics": "Names the weakest link honestly and a specific way to make it earned.",
+    "subplots": "For each subplot: purpose, people, conflict, progression, and resolution or deliberate non-resolution.",
+    "thread_intersections": "Names specific points where threads collide and change the main plot’s direction.",
+    "novel_fit": "Makes a deliberate keep, adapt, move, save, or cut decision for each uncertain idea, with a reason.",
+    "sequence_map": "Lists the major sequences with their purpose, pressure, and the turn that hands off to the next one.",
+    "scene_architecture": "For key scenes: who wants what, what resists, what changes, and what is revealed or withheld.",
+    "chapter_pacing": "Notes where the story should accelerate or rest, and how transitions and chapter breaks serve that rhythm.",
+    "opening_chapter": "Specifies what readers should know, feel, question, and expect by the end of Chapter One—without writing it.",
+    "continuity_ledger": "Names the facts that could create contradictions and where you will record them as you draft.",
+    "consistency_rules": "Lists key setups with planned payoffs, who knows what and when, and the questions left open on purpose.",
+    "quality_standards": "Gives a few observable checks tailored to this novel that you could apply to any chapter.",
+    "deferred_decisions": "Sorts open questions into resolve now, monitor while drafting, discover through drafting, and intentionally unknown—with reasons.",
+    "readiness_assessment": "Gives an honest judgment: what is solid, what is uncertain, which risks matter, and the next step for Chapter One.",
+}
+
+# Common weak answers and how to improve them (readme §5), per question.
+_QUESTION_WEAK = {
+    "story_seed": "A polished pitch or a genre label (“an epic fantasy”). Go back to the concrete detail or moment that first caught you.",
+    "story_identity": "A setting or theme without a story (“a world where memory is currency”). Add who acts, what they want, and what stands in the way.",
+    "dramatic_interest": "“It’s exciting,” or a list of events. Name the question readers will need answered, and what only this story can do with it.",
+    "creative_intent": "A moral (“it teaches that…”). Rephrase it as a question or tension the story explores, and note what could lead readers elsewhere.",
+    "target_audience": "“Everyone” or “adults.” Describe what this reader already loves and what they will tolerate in complexity, pace, and darkness.",
+    "genre": "A shelf label alone. Add the two or three expectations that label creates and your decision about each.",
+    "reading_experience": "Adjectives (“gripping, emotional”). Say what the reader is waiting to find out and what the ending should leave with them.",
+    "promise_tradeoffs": "“No trade-offs.” Look for places where complexity, pace, or genre signals may surprise readers, and decide whether that is intended.",
+    "tone_atmosphere": "One adjective (“dark”). Specify the mix (“grim but tender”), the range, and how the tone moves across the book.",
+    "atmosphere": "Mood words with no senses. Add concrete sounds, textures, light, or smells you will return to.",
+    "narrative_voice": "Only “third person.” Add distance, attitude, reliability, and what the narrator cannot know.",
+    "point_of_view": "“Mostly one character.” State the rule, such as one viewpoint per scene with switches only at scene breaks.",
+    "style_charter": "A list of admired authors or adjectives. Translate each into a concrete habit you can apply and check.",
+    "style_samples": "Borrowed prose, or a passage that contradicts the charter. Write your own, then check it against the charter.",
+    "style_guardrails": "Absolute bans (“never use adverbs”). Turn each into a caution with a reason and an exception.",
+    "core_theme": "A lesson (“love conquers all”). Rewrite it as a question the story tests, where both sides have a real case.",
+    "thematic_positions": "Heroes are right and villains wrong. Give the opposing view its strongest, most sympathetic form.",
+    "theme_in_action": "Characters explaining the theme. Identify the decision that tests it and what that decision costs.",
+    "protagonist": "A biography or a list of traits. Keep what drives decisions: the want, the belief behind it, and what it costs.",
+    "character_change": "“They learn to be brave” at the end. Name the events that force the change, or the reason they refuse it.",
+    "antagonist": "Evil for its own sake. Explain why the opposition believes it is right and what it can actually do to the protagonist.",
+    "cast_relationships": "Long biographies of minor characters. Start from function; if removing someone loses nothing, consider combining roles.",
+    "character_tests": "“The characters feel real.” Name the moment the protagonist chooses, and what it costs them.",
+    "world_system": "Encyclopedic lore. Keep the details that constrain behavior or raise the stakes.",
+    "social_systems": "Every institution described. Choose the systems that create conflict or pressure, and mark the rest out of scope.",
+    "speculative_rules": "Powers without limits or costs. Add a cost, a limit, and one consequence for ordinary life.",
+    "reader_world_knowledge": "Explaining everything in the opening. Mark what readers can learn later, infer, or never learn.",
+    "central_conflict": "A situation or theme (“a fight against injustice”). Say what the protagonist pursues and who or what resists.",
+    "inciting_pressure": "Something that happens near the protagonist without personal stakes. Tie it to what they want or fear.",
+    "plot_architecture": "A formula filled in mechanically. Adapt the beats to this story and note any deliberate departures.",
+    "causal_chain": "“And then…” sequences. Rewrite each link as a cause, a choice, and a consequence.",
+    "climax_resolution": "A rescue, coincidence, or explanation that settles things. Make the protagonist’s choice decide the outcome.",
+    "plot_diagnostics": "“No problems found.” Check each turn for coincidence or out-of-character behavior.",
+    "subplots": "Threads kept because the idea is appealing. State what each one changes in the main story or the theme.",
+    "thread_intersections": "Threads that run side by side. Find the moment each one changes the main story.",
+    "novel_fit": "Keeping everything, or cutting by reflex. Compare what each idea contributes before deciding.",
+    "sequence_map": "A chapter-by-chapter list of every event. Stay at the level of larger movements.",
+    "scene_architecture": "Scenes that describe without changing anything. Give each key scene a turn.",
+    "chapter_pacing": "Fixed chapter lengths. Plan rhythm around intensity and what the reader needs next.",
+    "opening_chapter": "Backstory and world explanation. Start from a situation under pressure that raises a forward question.",
+    "continuity_ledger": "Tracking everything. Track only the facts that could break or matter.",
+    "consistency_rules": "Mysteries even the author hasn’t resolved. Decide the answer, even if readers never learn it.",
+    "quality_standards": "Generic goals (“good pacing”). Turn each into a check you could apply to one chapter.",
+    "deferred_decisions": "Leaving everything open, or nothing. Decide which uncertainties are actually risky.",
+    "readiness_assessment": "A checklist score. Name the riskiest open question and whether drafting can test it.",
+}
+
+# Fillable worksheets for answers that benefit from structure (readme §5).
+_QUESTION_TEMPLATES = {
+    "point_of_view": "Viewpoint character(s):\nNarrative distance (close / middle / distant):\nWhen a viewpoint switch is allowed:\nWhat each viewpoint may know:",
+    "style_charter": "Sentence rhythm:\nVocabulary and diction:\nLevel of descriptive detail:\nImagery and figurative language:\nDialogue:\nInterior monologue:\nExposition:\nHumor, irony, understatement:",
+    "style_samples": "Example passage (not mandatory prose):\n\n\nWhat it demonstrates:",
+    "thematic_positions": "Central question:\nPosition 1 — held by:  — gets right:  — gets wrong:\nPosition 2 — held by:  — gets right:  — gets wrong:",
+    "protagonist": "Role:\nImmediate goal:\nLong-term goal:\nMotivation and its origin:\nValues and beliefs:\nFear or vulnerability:\nStrengths and limits:\nStory-relevant history:\nSecrets or misinformation:\nDistinctive voice:",
+    "character_change": "Starting belief or strategy:\nWhat tests it:\nCost of changing:\nCost of refusing:\nPossible end state:",
+    "antagonist": "Goal:\nWhy it makes sense to them:\nMethods and resources:\nLimits:\nConnection to the protagonist’s values:",
+    "cast_relationships": "Character | Function in the story | Wants from the protagonist | Conflict or leverage\n\n | | | ",
+    "speculative_rules": "Rule:\nWhat it allows:\nWhat it forbids:\nCost or limit:\nWho has access:\nDownstream consequences:",
+    "reader_world_knowledge": "Fact | Author knows | Reader learns when (now / later / implied / never)\n\n | | ",
+    "central_conflict": "The protagonist pursues:\nOpposed by:\nPersonal stakes:\nBroader stakes:\nDramatic question:",
+    "plot_architecture": "Setup:\nInciting event:\nFirst major turn:\nMidpoint shift:\nCrisis:\nClimax:\nResolution:\nWhy this shape fits:",
+    "causal_chain": "Because ___, the protagonist chooses to ___, which causes ___.\nThe opposition responds by ___.\n\nBecause ___, ...",
+    "subplots": "Subplot:\nPurpose:\nCharacters:\nConflict:\nThematic contribution:\nProgression:\nResolution (or deliberate non-resolution):",
+    "thread_intersections": "Thread | Where it meets the main plot | What it changes\n\n | | ",
+    "novel_fit": "Idea | Keep / adapt / move / save for later / cut | Reason\n\n | | ",
+    "scene_architecture": "Scene:\nObjective (who wants what):\nParticipants:\nResistance:\nTurn:\nConsequence:\nRevealed or withheld:\nEmotional movement:",
+    "opening_chapter": "Viewpoint:\nSituation:\nImmediate interest:\nCharacter pressure:\nContext readers need:\nTone:\nBy the end, readers know:\n…feel:\n…question:\n…anticipate:\nNot explained yet:",
+    "continuity_ledger": "Timeline:\nCharacter ages and histories:\nLocations and travel times:\nWorld rules:\nWho knows what, and when:\nNames and terminology:\nRecurring objects:\nWhere I will record these:",
+    "consistency_rules": "Setup | Payoff | Who knows, and when\n\n | | \n\nOpen on purpose:",
+    "deferred_decisions": "Resolve before drafting:\nMonitor while drafting:\nDiscover through drafting:\nIntentionally unknown:",
+    "readiness_assessment": "Solid enough to draft:\nStill uncertain:\nHarmless uncertainties:\nReal risks to address first:\nWhat drafting can discover:\nNext step for Chapter One:",
+}
+
+# Paraphrased craft sources for each stage (readme §2). Methods are credited to
+# their authors in summary form; "Planner synthesis" marks the planner's own
+# combination of ideas. Nothing here quotes the books.
+_STAGE_SOURCES = {
+    "Stage A — Story Identity": "Lisa Cron (Story Genius): start from what the story is really about—the protagonist’s inner struggle and the point it makes—rather than from plot events. Jessica Brody (Save the Cat! Writes a Novel): test the idea as a one-sentence pitch with a flawed hero, a catalyst, and a goal. Planner synthesis: keep the original spark visible and compare your intent with the likely reader experience.",
+    "Stage B — Reader Promise": "Jessica Brody (Save the Cat! Writes a Novel): her ten story genres (such as Whydunit, Rites of Passage, and Dude with a Problem) describe the kind of story a reader is promised, independent of bookstore category. Planner synthesis: decide which conventions to honor, bend, or subvert, and name the trade-offs.",
+    "Stage C — Tone, Voice & Style": "Lisa Cron (Story Genius): readers experience events through the protagonist’s subjective view—what things mean to them—so viewpoint and voice carry the story’s meaning. Planner synthesis: the source books concentrate on story and structure; the Style and Tone Charter turns tonal adjectives into observable prose choices.",
+    "Stage D — Theme": "Jessica Brody (Save the Cat! Writes a Novel): theme is what the hero needs to learn, often hinted early (Theme Stated) and explored through the B Story. Lisa Cron (Story Genius): meaning grows from the protagonist’s struggle with a mistaken belief. Planner synthesis: phrase the theme as a live question with credible opposing answers.",
+    "Stage E — Characters": "Lisa Cron (Story Genius): know the protagonist’s desire, the misbelief in its way, and where that misbelief came from before plotting. Jessica Brody (Save the Cat! Writes a Novel): a hero has flaws, a want, and a deeper need. Planner synthesis: develop secondary characters by function first, and test the cast for agency and redundancy.",
+    "Stage F — World & Internal Logic": "Planner synthesis: the source books treat setting mainly as pressure on character and plot, so this stage develops only the parts of the world that change behavior, conflict, atmosphere, or theme, and keeps author knowledge separate from reader knowledge.",
+    "Stage G — Conflict & Plot": "K.M. Weiland (Structuring Your Novel and its Workbook): structural turning points—inciting event, plot points, pinch points, midpoint, climax—with the protagonist reacting until the midpoint and acting after it. Jessica Brody (Save the Cat! Writes a Novel): the fifteen-beat sheet, from the Catalyst and Break into 2 through All Is Lost to the Finale. Lisa Cron (Story Genius): plot as a cause-and-effect chain driven by the protagonist’s inner struggle. Where they differ: Weiland and Brody begin from structural beats, while Cron builds outward from the protagonist’s internal change; this stage uses beats as checkpoints and causality as the test.",
+    "Stage H — Subplots & Integration": "Jessica Brody (Save the Cat! Writes a Novel): the B Story—often a relationship—carries the theme and helps the hero learn it. Planner synthesis: test each thread by imagining the novel without it.",
+    "Stage I — Scenes & Chapters": "K.M. Weiland (Structuring Your Novel), building on Dwight V. Swain: scenes of goal, conflict, and disaster, followed by sequels of reaction, dilemma, and decision. Lisa Cron (Story Genius): plan scenes as cards that record the event, what the protagonist realizes, and how it causes the next scene. Jessica Brody (Save the Cat! Writes a Novel): the Opening Image and Setup show the hero’s world and flaws before the Catalyst.",
+    "Stage J — Continuity & Readiness": "Planner synthesis of the Cookbook’s continuity and revision standards: track setups and payoffs, information flow, and viewpoint rules in a light ledger, and judge readiness by risk rather than completeness—without demanding perfection before drafting.",
+}
+
+# How each stage contributes to the “Ready to Write Chapter One?” assessment
+# (readme §7: structural, character, tonal, and narrative clarity).
+_STAGE_DIMENSIONS = {
+    "Stage A — Story Identity": "Narrative clarity",
+    "Stage B — Reader Promise": "Narrative clarity",
+    "Stage C — Tone, Voice & Style": "Tone & voice",
+    "Stage D — Theme": "Theme",
+    "Stage E — Characters": "Character",
+    "Stage F — World & Internal Logic": "World & continuity",
+    "Stage G — Conflict & Plot": "Structure",
+    "Stage H — Subplots & Integration": "Structure",
+    "Stage I — Scenes & Chapters": "Structure",
+    "Stage J — Continuity & Readiness": "World & continuity",
 }
 
 
@@ -269,6 +441,9 @@ def build_questions(question_type: Callable[..., Any]) -> list[Any]:
                 affects=affects,
                 dependencies=_QUESTION_DEPENDENCIES.get(question_id, ()),
                 examples=_QUESTION_EXAMPLES.get(question_id, ""),
+                strong=_QUESTION_STRONG[question_id],
+                weak=_QUESTION_WEAK[question_id],
+                template=_QUESTION_TEMPLATES.get(question_id, ""),
             )
         )
     return questions

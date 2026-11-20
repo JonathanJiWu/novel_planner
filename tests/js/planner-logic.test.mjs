@@ -110,3 +110,92 @@ test("buildMarkdown keeps multi-line answers inside their list item", () => {
   assert.ok(markdown.startsWith("# My Novel\n"));
   assert.ok(markdown.includes("### Stage J — Continuity & Readiness"));
 });
+
+test("signing in carries work into an empty account unchanged", () => {
+  const account = { ...Logic.emptyProject(), revision: 3 };
+  const guest = {
+    ...Logic.emptyProject(),
+    title: "The Lantern Archive",
+    answers: { story_identity: "A keeper finds a letter." },
+    question_states: { story_identity: { planning_level: "essential", certainty: "provisional" } },
+    ideas: [{ id: "i1", text: "Lost letters", category: "Character" }],
+    materials: [{ id: "m1", text: "Notes", category: "World", status: "imported", source: "notes.md" }],
+    theme: "paper",
+  };
+  const { project, summary } = Logic.mergeProjects(account, guest, questions);
+  assert.equal(project.title, "The Lantern Archive");
+  assert.equal(project.answers.story_identity, "A keeper finds a letter.");
+  assert.deepEqual(project.question_states.story_identity, { planning_level: "essential", certainty: "provisional" });
+  assert.equal(project.ideas.length, 1);
+  assert.equal(project.materials.length, 1);
+  assert.equal(project.theme, "paper");
+  assert.equal(project.revision, 3, "the account's revision is kept so the save is conflict-checked");
+  assert.deepEqual(summary, { answersAdded: 1, answersKeptAsMaterial: 0, ideasAdded: 1, materialsAdded: 1, titleUsed: true });
+});
+
+test("merging never overwrites the account and never loses the browser's work", () => {
+  const account = {
+    ...Logic.emptyProject(),
+    title: "Account Novel",
+    answers: { story_identity: "The account's premise", genre: "Mystery" },
+    ideas: [{ id: "same-id", text: "Account idea", category: "Story" }],
+  };
+  const guest = {
+    ...Logic.emptyProject(),
+    title: "Browser Novel",
+    answers: { story_identity: "The browser's premise", genre: "Mystery", protagonist: "A keeper" },
+    ideas: [{ id: "same-id", text: "Browser idea", category: "Story" }, { id: "x", text: "Account idea", category: "Story" }],
+  };
+  const { project, summary } = Logic.mergeProjects(account, guest, questions);
+  assert.equal(project.title, "Account Novel");
+  assert.equal(project.answers.story_identity, "The account's premise");
+  assert.equal(project.answers.protagonist, "A keeper");
+  const kept = project.materials.find((material) => material.text === "The browser's premise");
+  assert.ok(kept, "the differing answer is preserved as material");
+  assert.equal(kept.status, "tentative");
+  assert.equal(kept.category, "Story");
+  assert.match(kept.source, /^Answer written before signing in: What is happening in this story/);
+  assert.deepEqual(project.ideas.map((idea) => idea.text).sort(), ["Account idea", "Browser idea"]);
+  assert.equal(new Set(project.ideas.map((idea) => idea.id)).size, project.ideas.length, "ids stay unique");
+  assert.equal(summary.answersKeptAsMaterial, 1);
+  assert.equal(Logic.validationError(project), null);
+});
+
+test("merging the same work twice adds nothing the second time", () => {
+  const account = { ...Logic.emptyProject(), answers: { story_identity: "Account" } };
+  const guest = {
+    ...Logic.emptyProject(),
+    answers: { story_identity: "Browser", genre: "Mystery" },
+    ideas: [{ id: "i", text: "Idea", category: "Plot" }],
+    materials: [{ id: "m", text: "Material", category: "World", status: "imported", source: "a.md" }],
+  };
+  const once = Logic.mergeProjects(account, guest, questions).project;
+  const twice = Logic.mergeProjects(once, guest, questions);
+  assert.deepEqual(twice.project, once);
+  assert.deepEqual(twice.summary, { answersAdded: 0, answersKeptAsMaterial: 0, ideasAdded: 0, materialsAdded: 0, titleUsed: false });
+});
+
+test("hasContent, nextStageIndex, and note categories", () => {
+  assert.equal(Logic.hasContent(Logic.emptyProject()), false);
+  assert.equal(Logic.hasContent({ ...Logic.emptyProject(), title: "Untitled novel" }), false);
+  assert.equal(Logic.hasContent({ ...Logic.emptyProject(), title: "Named" }), true);
+  assert.equal(Logic.hasContent({ ...Logic.emptyProject(), answers: { story_seed: "  " } }), false);
+  assert.equal(Logic.hasContent({ ...Logic.emptyProject(), ideas: [{ id: "a", text: "x", category: "Story" }] }), true);
+
+  assert.equal(Logic.nextStageIndex(stages, questions, {}, {}), 0);
+  const stageA = questions.filter((question) => question.section === stages[0].title && question.required);
+  const answers = Object.fromEntries(stageA.map((question) => [question.question_id, "Done"]));
+  const states = Object.fromEntries(stageA.map((question) => [question.question_id, { planning_level: "essential", certainty: "settled" }]));
+  assert.equal(Logic.nextStageIndex(stages, questions, answers, states), 1);
+
+  assert.deepEqual(Logic.categoriesForStage("Stage E — Characters"), ["Character"]);
+  assert.deepEqual(Logic.categoriesForStage("Stage G — Conflict & Plot"), ["Plot"]);
+  assert.deepEqual(Logic.categoriesForStage("Stage J — Continuity & Readiness"), []);
+  assert.equal(Logic.categoryForStage("Stage J — Continuity & Readiness"), "Unsorted");
+});
+
+test("the status help covers every planning level and decision state", () => {
+  assert.deepEqual(Object.keys(Logic.PLANNING_LEVEL_HELP), [...Logic.PLANNING_LEVELS]);
+  assert.deepEqual(Object.keys(Logic.CERTAINTY_HELP), [...Logic.CERTAINTIES]);
+  assert.equal(Logic.PLANNING_LEVEL_HELP.essential, "Must be sufficiently resolved before writing can begin.");
+});

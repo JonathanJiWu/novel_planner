@@ -148,20 +148,34 @@ export async function toastText(page) {
   return (await page.textContent("#toast")).trim();
 }
 
-export async function register(page, email, password = PASSWORD) {
-  await page.waitForSelector("#auth-page:not([hidden])");
+/** Open the optional sign-in dialog (it may already be open, e.g. after a session expired). */
+export async function openSignIn(page) {
+  if (!(await page.isVisible("#auth-dialog[open]"))) await page.click("#login-button");
+  await page.waitForSelector("#auth-dialog[open]");
+}
+
+async function submitCredentials(page, button, email, password) {
+  await openSignIn(page);
   await page.fill("#auth-email", email);
   await page.fill("#auth-password", password);
-  await page.click("#sign-up");
+  await page.click(button);
+  await page.waitForSelector("#auth-dialog", { state: "hidden" });
+  await page.waitForSelector("#sign-out:not([hidden])");
   await waitForSaved(page);
 }
 
-export async function logIn(page, email, password = PASSWORD) {
-  await page.waitForSelector("#auth-page:not([hidden])");
-  await page.fill("#auth-email", email);
-  await page.fill("#auth-password", password);
-  await page.click("#sign-in");
+/** Sign out and wait for the page to reload into a fresh visitor session. */
+export async function signOut(page) {
+  await Promise.all([page.waitForEvent("load"), page.click("#sign-out")]);
   await waitForSaved(page);
+}
+
+export async function register(page, email, password = PASSWORD) {
+  await submitCredentials(page, "#sign-up", email, password);
+}
+
+export async function logIn(page, email, password = PASSWORD) {
+  await submitCredentials(page, "#sign-in", email, password);
 }
 
 export async function addIdea(page, text, category) {

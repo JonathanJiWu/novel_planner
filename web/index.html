@@ -28,9 +28,9 @@
         </button>
         <label class="theme-picker" for="theme-select">APPEARANCE
           <select id="theme-select">
-            <option value="dark">Default dark</option>
-            <option value="light">Comfortable light</option>
-            <option value="paper">Warm paper</option>
+            <option value="dark">Dark mode</option>
+            <option value="light">Bright mode</option>
+            <option value="paper">Parchment mode</option>
           </select>
         </label>
 
@@ -51,11 +51,18 @@
           <div class="topbar-actions">
             <span class="save-state" id="save-state" role="status" aria-live="polite"><span class="save-dot"></span> Loading project…</span>
             <span id="account-email" class="account-email" hidden></span>
-            <button id="login-button" class="secondary-button" type="button" hidden>Log in</button>
-            <button id="register-button" class="primary-button" type="button" hidden>Register</button>
+            <button id="login-button" class="secondary-button" type="button" hidden>Sign in</button>
             <button id="sign-out" class="secondary-button" type="button" hidden>Sign out</button>
           </div>
         </header>
+
+        <aside id="account-prompt" class="account-prompt" aria-label="Save your work" hidden>
+          <p id="account-prompt-text"></p>
+          <div class="account-prompt-actions">
+            <button id="account-prompt-signin" class="primary-button" type="button">Sign in to save it</button>
+            <button id="account-prompt-dismiss" class="secondary-button" type="button">Not now</button>
+          </div>
+        </aside>
 
         <div id="sync-banner" class="sync-banner" role="alert" hidden>
           <p id="sync-banner-text"></p>
@@ -65,31 +72,7 @@
           </div>
         </div>
 
-        <section id="auth-page" class="auth-page" hidden>
-          <div class="eyebrow"><span class="eyebrow-line"></span> PRIVATE STORY WORKSPACE</div>
-          <h1>Welcome to <em>Novel Architect.</em></h1>
-          <p id="auth-intro" class="intro-copy">Log in to keep your project private and available wherever you sign in.</p>
-          <form id="auth-form" class="auth-card">
-            <label for="auth-email">EMAIL</label>
-            <input id="auth-email" type="email" autocomplete="email" maxlength="320" required>
-            <label for="auth-password">PASSWORD</label>
-            <input id="auth-password" type="password" autocomplete="current-password" minlength="8" maxlength="200">
-            <div class="auth-actions">
-              <button id="sign-in" class="primary-button" type="submit">Sign in</button>
-              <button id="sign-up" class="secondary-button" type="button">Create account</button>
-            </div>
-            <button id="magic-link" class="text-button auth-link" type="button" hidden>Send me a magic link</button>
-            <div class="oauth-actions" hidden>
-              <button data-provider="google" class="secondary-button" type="button">Google</button>
-              <button data-provider="github" class="secondary-button" type="button">GitHub</button>
-              <button data-provider="apple" class="secondary-button" type="button">Apple</button>
-              <button data-provider="facebook" class="secondary-button" type="button">Meta</button>
-            </div>
-            <p id="auth-message" class="auth-message" role="status"></p>
-          </form>
-        </section>
-
-        <section id="idea-inbox" class="page-section">
+        <section id="idea-inbox" class="page-section active">
           <div class="eyebrow"><span class="eyebrow-line"></span> START WITH WHAT YOU HAVE</div>
           <h1>Every novel begins<br>with <em>something.</em></h1>
           <p class="intro-copy">A scene you can’t forget. A character who won’t leave you alone. A question with no easy answer. Get it all down here—we’ll give it shape as you go.</p>
@@ -140,7 +123,7 @@
           <div class="continue-card">
             <div class="continue-icon">✎</div>
             <div><strong>Ready to give an idea a little shape?</strong><p>Move into the guided planner whenever you’re ready. You can keep collecting ideas at any time.</p></div>
-            <button class="text-button" type="button" data-open-stage="Stage A — Story Identity">Begin planning <span>→</span></button>
+            <button id="continue-planning" class="text-button" type="button"><span id="continue-planning-label">Begin planning</span> <span>→</span></button>
           </div>
         </section>
 
@@ -148,6 +131,14 @@
           <div class="eyebrow"><span class="eyebrow-line"></span> PROJECT KNOWLEDGE REPOSITORY</div>
           <h1>Your project, <em>together.</em></h1>
           <p class="intro-copy">Review answers, open decisions, ideas, and original material without losing where anything came from.</p>
+          <section id="readiness" class="readiness-panel" aria-labelledby="readiness-title">
+            <span class="guide-label">THE COMPLETION STANDARD</span>
+            <h2 id="readiness-title">Ready to write Chapter One?</h2>
+            <p id="readiness-verdict" class="readiness-verdict"></p>
+            <ul id="readiness-dimensions" class="readiness-dimensions"></ul>
+            <div id="readiness-lists" class="readiness-lists"></div>
+            <p class="readiness-note">This judgment comes from your own planning statuses. Uncertainty you have named is fine: Chapter One does not require a finished plan.</p>
+          </section>
           <div class="overview-toolbar">
             <label for="overview-search">SEARCH PROJECT</label>
             <input id="overview-search" type="search" placeholder="Search answers and material…">
@@ -161,6 +152,11 @@
           </div>
           <div id="overview-summary" class="overview-summary"></div>
           <div id="overview-list" class="overview-list"></div>
+          <details class="method-note">
+            <summary>About the method and its sources</summary>
+            <p>Novel Architect organizes planning with <em>The Unified Novel-Writing Cookbook</em>. Methods credited to Lisa Cron (<em>Story Genius</em>), Jessica Brody (<em>Save the Cat! Writes a Novel</em>), and K.M. Weiland (<em>Structuring Your Novel</em> and the <em>Structuring Your Novel Workbook</em>) are paraphrased summaries of their widely known principles, not quotations. Each stage names the sources it draws on and where the authors differ.</p>
+            <p>Questions, exercises, examples, and worksheets are original to this planner; notes marked “Planner synthesis” are its own combination of those ideas. The planner never writes answers for you: every decision, status, and assessment here is yours.</p>
+          </details>
         </section>
 
         <section id="admin-page" class="page-section">
@@ -188,8 +184,21 @@
               <p><strong>Decision check:</strong> <span id="stage-criteria"></span></p>
               <p><strong>Watch for:</strong> <span id="stage-watch"></span></p>
             </details>
+            <details class="stage-diagnostics">
+              <summary>Craft sources for this stage</summary>
+              <p id="stage-sources"></p>
+            </details>
+            <details class="stage-diagnostics">
+              <summary>What the planning statuses mean</summary>
+              <dl id="status-legend" class="status-legend"></dl>
+            </details>
           </div>
+          <details id="stage-notes" class="stage-notes" hidden>
+            <summary id="stage-notes-summary">Your notes for this stage</summary>
+            <ul id="stage-notes-list"></ul>
+          </details>
           <div id="question-list" class="question-list"></div>
+          <button id="stage-readiness-link" class="secondary-button readiness-link" type="button" hidden>See the Ready to write Chapter One? assessment →</button>
           <div class="page-navigation">
             <button id="previous-stage" class="secondary-button" type="button">← Previous</button>
             <button id="next-stage" class="primary-button" type="button">Next section <span>→</span></button>
@@ -197,6 +206,31 @@
         </section>
       </main>
     </div>
+    <dialog id="auth-dialog" class="auth-dialog" aria-labelledby="auth-title">
+      <form id="auth-form" class="auth-card">
+        <button id="auth-close" class="dialog-close" type="button" aria-label="Close">×</button>
+        <div class="eyebrow"><span class="eyebrow-line"></span> OPTIONAL</div>
+        <h2 id="auth-title">Sign in to save your project</h2>
+        <p id="auth-intro" class="intro-copy"></p>
+        <label for="auth-email">EMAIL</label>
+        <input id="auth-email" type="email" autocomplete="email" maxlength="320" required>
+        <label for="auth-password">PASSWORD</label>
+        <input id="auth-password" type="password" autocomplete="current-password" minlength="8" maxlength="200">
+        <div class="auth-actions">
+          <button id="sign-in" class="primary-button" type="submit">Sign in</button>
+          <button id="sign-up" class="secondary-button" type="button">Create account</button>
+        </div>
+        <button id="magic-link" class="text-button auth-link" type="button" hidden>Send me a magic link</button>
+        <div class="oauth-actions" hidden>
+          <button data-provider="google" class="secondary-button" type="button">Google</button>
+          <button data-provider="github" class="secondary-button" type="button">GitHub</button>
+          <button data-provider="apple" class="secondary-button" type="button">Apple</button>
+          <button data-provider="facebook" class="secondary-button" type="button">Meta</button>
+        </div>
+        <p id="auth-message" class="auth-message" role="status"></p>
+        <button id="auth-continue" class="text-button auth-link" type="button">Continue without signing in</button>
+      </form>
+    </dialog>
     <article id="print-view" class="print-view" aria-hidden="true"></article>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="./planner-logic.js" defer></script>

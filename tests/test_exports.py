@@ -23,10 +23,15 @@ RICH_PROJECT = {
         "protagonist": "林黛玉 — émigré; Пушкин",
         "genre": "Literary fantasy",
         "deferred_decisions": "   ",
+        "atmosphere": "Salt, fog, and lamp oil.",
+        "readiness_assessment": "Close: the opening is clear, the ending is not.",
     },
     "question_states": {
         "story_identity": {"planning_level": "intentionally_unknown", "certainty": "settled"},
         "genre": {"planning_level": "essential", "certainty": "provisional"},
+        "protagonist": {"planning_level": "essential", "certainty": "settled"},
+        "chapter_pacing": {"planning_level": "deferred", "certainty": "needs_work"},
+        "atmosphere": {"planning_level": "important", "certainty": "provisional"},
     },
     "ideas": [{"id": "i1", "text": "An idea\nwith two lines", "category": "Tone & style"}],
     "materials": [
@@ -46,6 +51,23 @@ def test_multiline_answers_stay_inside_their_list_item():
     assert "— Essential, Provisional" in markdown
     assert "### World — Intentionally Unknown" in markdown
     assert markdown.startswith("# The Quiet Archive\n")
+
+
+def test_markdown_ends_with_the_readme_completion_standard():
+    markdown = build_markdown(validate_project_data(RICH_PROJECT))
+    readiness = markdown[markdown.index("## Ready to Write Chapter One?"):]
+    assert readiness.startswith("## Ready to Write Chapter One?\n\nNot yet: ")
+    assert "- Character: 1 of 3 essential decisions settled" in readiness
+    assert "### Address before drafting" in readiness
+    assert "### Monitor while drafting\n\n- Tone, voice & style: What should it feel like to inhabit this world?" in readiness
+    assert "### Discover through drafting\n\n- Scenes & chapters:" in readiness
+    assert "### Intentionally unknown\n\n- Story identity: What is happening in this story" in readiness
+    assert "### Your assessment\n\nClose: the opening is clear, the ending is not." in readiness
+    assert "- [x] Characters: Who carries the story?" in readiness
+    assert "- [ ] Reader promise: Which genre or combination" in readiness
+    # Every stage credits its sources (readme.txt §2).
+    assert markdown.count("- **Draws on:** ") == 10
+    assert "Lisa Cron (Story Genius)" in markdown and "K.M. Weiland" in markdown and "Jessica Brody" in markdown
 
 
 def test_pdf_embeds_unicode_fonts_and_keeps_cjk_text():

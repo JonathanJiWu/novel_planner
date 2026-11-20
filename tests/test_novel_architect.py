@@ -26,7 +26,7 @@ def test_planning_stages_cover_readme_outputs_and_completion():
     assert {stage["title"] for stage in stages} == {q.section for q in build_question_bank()}
 
 
-def test_project_answers_and_export():
+def test_project_answers_and_export(tmp_path):
     project = NovelProject.with_questions("Test Novel")
     project.set_answer("story_identity", "A hidden history rewrites a city")
     project.set_answer("genre", "science fiction mystery")
@@ -38,10 +38,10 @@ def test_project_answers_and_export():
     assert "A hidden history rewrites a city" in markdown
     assert "science fiction mystery" in markdown
 
-    export_path = Path("test_output.md")
+    export_path = tmp_path / "test_output.md"
     project.export_markdown(export_path)
     assert export_path.exists()
-    export_path.unlink(missing_ok=True)
+    assert export_path.read_text(encoding="utf-8") == markdown
 
 
 def test_next_questions_depends_on_answers():

@@ -78,7 +78,7 @@ def test_static_github_pages_auth_fallback_is_complete():
     root = Path(__file__).resolve().parents[1]
     javascript = (root / "web" / "app.js").read_text(encoding="utf-8")
 
-    assert 'authMode = "indexeddb"' in javascript
+    assert 'session.mode === "indexeddb"' in javascript
     assert "openStaticAuthDatabase" in javascript
     assert "staticRegister" in javascript
     assert "staticLogin" in javascript

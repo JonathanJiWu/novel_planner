@@ -1,20 +1,63 @@
 name: Deploy authenticated app to Render
 
+# Runs after "Test and deploy Novel Architect" succeeds on main, so only tested
+# commits reach Render. Configure:
+#   - secret   RENDER_DEPLOY_HOOK_URL  (Render service > Settings > Deploy Hook)
+#   - variable RENDER_SERVICE_URL      (optional, e.g. https://novel-architect.onrender.com;
+#                                       enables the check that the new commit went live)
 on:
-  push:
-    branches: ["main"]
+  workflow_run:
+    workflows: ["Test and deploy Novel Architect"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
+  check:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.hook.outputs.configured }}
+    steps:
+      - id: hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Render deployment not configured::Add the RENDER_DEPLOY_HOOK_URL secret to deploy the account-based app to Render. Nothing was deployed."
+          fi
+
   deploy:
+    needs: check
+    if: needs.check.outputs.configured == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Render deploy
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: curl --fail --show-error --silent --request POST "$RENDER_DEPLOY_HOOK_URL"
+
+      - name: Wait for the new commit to go live
+        if: vars.RENDER_SERVICE_URL != ''
+        env:
+          SERVICE_URL: ${{ vars.RENDER_SERVICE_URL }}
+          EXPECTED: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
-          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
-            echo "RENDER_DEPLOY_HOOK_URL is not configured." >&2
-            exit 1
-          fi
-          curl --fail --show-error --silent --request POST "$RENDER_DEPLOY_HOOK_URL"
+          for attempt in $(seq 1 60); do
+            commit=$(curl --silent --max-time 10 "${SERVICE_URL%/}/api/health" \
+              | python3 -c "import json, sys; print(json.load(sys.stdin).get('commit', ''))" 2>/dev/null || true)
+            if [ "$commit" = "$EXPECTED" ]; then
+              curl --silent --fail "${SERVICE_URL%/}/api/config" > /dev/null
+              echo "Render is serving $EXPECTED and the API responds."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Render did not start serving $EXPECTED within 10 minutes (last reported: ${commit:-nothing})"
+          exit 1

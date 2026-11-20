@@ -1,0 +1,15 @@
+{
+  "name": "novel-architect",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Browser tests for Novel Architect (the application itself is Python and plain JavaScript).",
+  "scripts": {
+    "test:js": "node --test \"tests/js/*.test.mjs\"",
+    "test:e2e": "node --test --test-concurrency=1 \"tests/e2e/*.test.mjs\"",
+    "test": "npm run test:js && npm run test:e2e"
+  },
+  "devDependencies": {
+    "pdfjs-dist": "4.10.38",
+    "playwright": "1.63.0"
+  }
+}

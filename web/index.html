@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#080909">
     <title>Novel Architect — Gather your story</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
@@ -16,7 +17,7 @@
         </a>
         <div class="project-label">YOUR PROJECT</div>
         <label class="project-title-label" for="project-title">Project name</label>
-        <input id="project-title" class="project-title-input" maxlength="200" value="My Novel">
+        <input id="project-title" class="project-title-input" maxlength="200" value="My Novel" autocomplete="off">
 
         <nav id="stage-nav" class="stage-nav" aria-label="Planning sections"></nav>
         <button id="overview-button" class="nav-item utility-nav" type="button">
@@ -35,9 +36,12 @@
 
         <div class="sidebar-bottom">
           <div class="progress-label"><span>Blueprint progress</span><strong id="progress-value">0%</strong></div>
-          <div class="progress-track"><div id="progress-bar"></div></div>
-          <a class="export-link" href="/api/export">↓ &nbsp; Export writing plan</a>
-          <a class="export-link" href="/api/export/pdf">↓ &nbsp; Export PDF</a>
+          <div class="progress-track" role="presentation"><div id="progress-bar"></div></div>
+          <p id="progress-detail" class="progress-detail"></p>
+          <div class="export-links">
+            <a id="export-markdown" class="export-link" href="/api/export">↓ &nbsp; Export writing plan</a>
+            <a id="export-pdf" class="export-link" href="/api/export/pdf">↓ &nbsp; Export PDF</a>
+          </div>
         </div>
       </aside>
 
@@ -45,28 +49,37 @@
         <header class="topbar">
           <div class="breadcrumb">MY PROJECT <span>/</span> <b id="current-breadcrumb">IDEA INBOX</b></div>
           <div class="topbar-actions">
-            <span class="save-state" id="save-state"><span class="save-dot"></span> Loading project…</span>
+            <span class="save-state" id="save-state" role="status" aria-live="polite"><span class="save-dot"></span> Loading project…</span>
+            <span id="account-email" class="account-email" hidden></span>
             <button id="login-button" class="secondary-button" type="button" hidden>Log in</button>
             <button id="register-button" class="primary-button" type="button" hidden>Register</button>
             <button id="sign-out" class="secondary-button" type="button" hidden>Sign out</button>
           </div>
         </header>
 
+        <div id="sync-banner" class="sync-banner" role="alert" hidden>
+          <p id="sync-banner-text"></p>
+          <div class="sync-banner-actions">
+            <button id="conflict-load" class="secondary-button" type="button">Load the saved version</button>
+            <button id="conflict-keep" class="primary-button" type="button">Keep my version</button>
+          </div>
+        </div>
+
         <section id="auth-page" class="auth-page" hidden>
           <div class="eyebrow"><span class="eyebrow-line"></span> PRIVATE STORY WORKSPACE</div>
           <h1>Welcome to <em>Novel Architect.</em></h1>
-          <p class="intro-copy">Sign in to keep your projects private and available across devices.</p>
+          <p id="auth-intro" class="intro-copy">Log in to keep your project private and available wherever you sign in.</p>
           <form id="auth-form" class="auth-card">
             <label for="auth-email">EMAIL</label>
-            <input id="auth-email" type="email" autocomplete="email" required>
+            <input id="auth-email" type="email" autocomplete="email" maxlength="320" required>
             <label for="auth-password">PASSWORD</label>
-            <input id="auth-password" type="password" autocomplete="current-password" minlength="8">
+            <input id="auth-password" type="password" autocomplete="current-password" minlength="8" maxlength="200">
             <div class="auth-actions">
               <button id="sign-in" class="primary-button" type="submit">Sign in</button>
               <button id="sign-up" class="secondary-button" type="button">Create account</button>
             </div>
-            <button id="magic-link" class="text-button auth-link" type="button">Send me a magic link</button>
-            <div class="oauth-actions">
+            <button id="magic-link" class="text-button auth-link" type="button" hidden>Send me a magic link</button>
+            <div class="oauth-actions" hidden>
               <button data-provider="google" class="secondary-button" type="button">Google</button>
               <button data-provider="github" class="secondary-button" type="button">GitHub</button>
               <button data-provider="apple" class="secondary-button" type="button">Apple</button>
@@ -76,14 +89,14 @@
           </form>
         </section>
 
-        <section id="idea-inbox" class="page-section active">
+        <section id="idea-inbox" class="page-section">
           <div class="eyebrow"><span class="eyebrow-line"></span> START WITH WHAT YOU HAVE</div>
           <h1>Every novel begins<br>with <em>something.</em></h1>
           <p class="intro-copy">A scene you can’t forget. A character who won’t leave you alone. A question with no easy answer. Get it all down here—we’ll give it shape as you go.</p>
 
           <div class="capture-card">
             <label for="idea-text" class="capture-label">What’s on your mind?</label>
-            <textarea id="idea-text" rows="5" placeholder="A character, a place, a what-if, a fragment of dialogue… Start anywhere."></textarea>
+            <textarea id="idea-text" rows="5" maxlength="100000" placeholder="A character, a place, a what-if, a fragment of dialogue… Start anywhere."></textarea>
             <div class="capture-footer">
               <label class="category-picker">FILE UNDER
                 <select id="idea-category">
@@ -97,19 +110,19 @@
                   <option>Scene</option>
                 </select>
               </label>
-                <div class="capture-actions">
-                  <button id="add-material" class="secondary-button" type="button">Import as material</button>
-                  <button id="add-idea" class="primary-button" type="button">Save this idea <span>↗</span></button>
-                </div>
+              <div class="capture-actions">
+                <button id="add-material" class="secondary-button" type="button">Import as material</button>
+                <button id="add-idea" class="primary-button" type="button">Save this idea <span>↗</span></button>
+              </div>
             </div>
           </div>
           <div class="material-import">
             <div>
               <span class="guide-label">BRING IN EXISTING MATERIAL</span>
-              <p>Paste or select a plain-text/Markdown file. Nothing becomes a planning decision until you review it.</p>
+              <p>Select one or more plain-text or Markdown files, or paste text above and choose “Import as material”. Long files are split into parts. Nothing becomes a planning decision until you review it in the project overview.</p>
             </div>
-            <label class="secondary-button file-button">Choose text file
-              <input id="material-file" type="file" accept=".txt,.md,.markdown,text/plain,text/markdown">
+            <label class="secondary-button file-button">Choose text files
+              <input id="material-file" type="file" multiple accept=".txt,.md,.markdown,text/plain,text/markdown">
             </label>
           </div>
 
@@ -121,13 +134,13 @@
           <div id="empty-ideas" class="empty-state">
             <span class="empty-icon">✳</span>
             <p>Your ideas will gather here.</p>
-            <span>Capture freely. You can sort, shape, and connect them later.</span>
+            <span>Capture freely. You can re-file any idea under a different category later.</span>
           </div>
 
           <div class="continue-card">
             <div class="continue-icon">✎</div>
             <div><strong>Ready to give an idea a little shape?</strong><p>Move into the guided planner whenever you’re ready. You can keep collecting ideas at any time.</p></div>
-            <button class="text-button" data-open-stage="Stage A — Story Identity">Begin planning <span>→</span></button>
+            <button class="text-button" type="button" data-open-stage="Stage A — Story Identity">Begin planning <span>→</span></button>
           </div>
         </section>
 
@@ -178,14 +191,15 @@
           </div>
           <div id="question-list" class="question-list"></div>
           <div class="page-navigation">
-            <button id="previous-stage" class="secondary-button">← Previous</button>
-            <button id="next-stage" class="primary-button">Next section <span>→</span></button>
+            <button id="previous-stage" class="secondary-button" type="button">← Previous</button>
+            <button id="next-stage" class="primary-button" type="button">Next section <span>→</span></button>
           </div>
         </section>
       </main>
     </div>
+    <article id="print-view" class="print-view" aria-hidden="true"></article>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./planner-logic.js" defer></script>
     <script src="./app.js" defer></script>
   </body>
 </html>

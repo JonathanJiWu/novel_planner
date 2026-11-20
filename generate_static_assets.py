@@ -1,26 +1,25 @@
+"""Write the planner content as static JSON for the GitHub Pages build (no server)."""
 import json
 from pathlib import Path
 
-from novel_architect import NovelProject, build_planning_stages
+from novel_architect import build_planning_stages, question_catalog
 
 
 WEB_ROOT = Path(__file__).resolve().parent / "web"
+STATIC_FILES = {
+    "questions.json": question_catalog,
+    "stages.json": build_planning_stages,
+}
 
-project = NovelProject.with_questions("Novel")
-questions = [
-    {
-        **question.__dict__,
-        "answer": "",
-        "dependencies": list(question.dependencies),
-    }
-    for question in project.questions.values()
-]
 
-(WEB_ROOT / "questions.json").write_text(
-    json.dumps(questions, ensure_ascii=False),
-    encoding="utf-8",
-)
-(WEB_ROOT / "stages.json").write_text(
-    json.dumps(build_planning_stages(), ensure_ascii=False),
-    encoding="utf-8",
-)
+def render() -> dict[str, str]:
+    return {name: json.dumps(build(), ensure_ascii=False) for name, build in STATIC_FILES.items()}
+
+
+def main() -> None:
+    for name, content in render().items():
+        (WEB_ROOT / name).write_text(content, encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()

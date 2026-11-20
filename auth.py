@@ -9,6 +9,9 @@ from fastapi import Depends, Header, HTTPException, status
 from config import settings
 
 
+LOCAL_USER_ID = "local-development-user"
+
+
 @dataclass(frozen=True)
 class AuthenticatedUser:
     user_id: str
@@ -21,14 +24,28 @@ def _jwks_client() -> jwt.PyJWKClient:
     return jwt.PyJWKClient(settings.jwks_url)
 
 
+def _unauthorized(detail: str = "Authentication is required.") -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=detail,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 def _token_from_header(authorization: str | None) -> str:
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication is required.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return authorization[7:].strip()
+        raise _unauthorized()
+    token = authorization[7:].strip()
+    if not token:
+        raise _unauthorized()
+    return token
+
+
+def bearer_token(authorization: str | None) -> str | None:
+    """Return the bearer token from an Authorization header value, if any."""
+    if isinstance(authorization, str) and authorization.startswith("Bearer "):
+        return authorization[7:].strip() or None
+    return None
 
 
 def require_user(authorization: str | None = Header(default=None)) -> AuthenticatedUser:
@@ -37,25 +54,17 @@ def require_user(authorization: str | None = Header(default=None)) -> Authentica
     if not settings.configured:
         if not authorization:
             if not settings.auth_required:
-                return AuthenticatedUser("local-development-user")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication is required.",
-            )
-        if authorization.startswith("Bearer "):
-            from auth_store import auth_store
-            try:
-                claims = auth_store.verify_token(authorization[7:].strip())
-                return AuthenticatedUser(claims["id"], claims["email"], authorization[7:].strip())
-            except ValueError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=str(exc),
-                ) from exc
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication is required.",
-        )
+                # Single-user local development: every request shares one project.
+                return AuthenticatedUser(LOCAL_USER_ID)
+            raise _unauthorized()
+        token = _token_from_header(authorization)
+        from auth_store import get_auth_store
+
+        try:
+            claims = get_auth_store().verify_token(token)
+        except ValueError as exc:
+            raise _unauthorized(str(exc)) from exc
+        return AuthenticatedUser(claims["id"], claims["email"], token)
 
     token = _token_from_header(authorization)
     try:
@@ -68,22 +77,16 @@ def require_user(authorization: str | None = Header(default=None)) -> Authentica
             issuer=settings.resolved_jwt_issuer,
         )
     except (jwt.PyJWTError, ValueError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="The authentication token is invalid or expired.",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from exc
+        raise _unauthorized("The authentication token is invalid or expired.") from exc
 
     user_id = claims.get("sub")
     if not isinstance(user_id, str) or not user_id:
-        raise HTTPException(status_code=401, detail="The token has no user identity.")
+        raise _unauthorized("The token has no user identity.")
     email = claims.get("email")
     return AuthenticatedUser(user_id, email if isinstance(email, str) else None, token)
 
 
 def require_admin(user: AuthenticatedUser = Depends(require_user)) -> AuthenticatedUser:
-    if not settings.admin_emails or not user.email:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator access is required.")
-    if user.email.lower() not in settings.admin_emails:
+    if not settings.is_admin_email(user.email):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator access is required.")
     return user

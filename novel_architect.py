@@ -1,9 +1,23 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
+
+
+def planning_label(value: str) -> str:
+    """Human-readable label for a planning level or certainty (e.g. "Intentionally Unknown")."""
+    return value.replace("_", " ").title()
+
+
+def markdown_list_item(text: str, indent: str = "  ") -> str:
+    """Render ``text`` as a nested list item, keeping later lines inside the item."""
+    first, *rest = text.splitlines() or [""]
+    lines = [f"{indent}- {first}"]
+    continuation = indent + "  "
+    lines.extend(f"{continuation}{line}" if line.strip() else "" for line in rest)
+    return "\n".join(lines)
 
 
 @dataclass
@@ -126,9 +140,8 @@ class NovelProject:
             for question in questions:
                 answer_text = question.answer or "Not yet answered"
                 sections.append(
-                    f"- **{question.prompt}** "
-                    f"({question.planning_level.title()})\n"
-                    f"  - {answer_text}"
+                    f"- **{question.prompt}** ({planning_label(question.planning_level)})\n"
+                    + markdown_list_item(answer_text)
                     + (f"\n  - Connects to: {question.affects}" if question.affects else "")
                 )
             sections.append("")
@@ -151,6 +164,14 @@ def build_planning_stages() -> List[dict[str, str]]:
     from planner_content import build_planning_stages as get_stages
 
     return get_stages()
+
+
+def question_catalog() -> List[dict[str, Any]]:
+    """Questions as JSON-ready dictionaries, as served to the browser."""
+    return [
+        {**asdict(question), "answer": "", "dependencies": list(question.dependencies)}
+        for question in build_question_bank()
+    ]
 
 
 def _demo_answers() -> Dict[str, str]:
@@ -196,14 +217,6 @@ def run_interactive(project: NovelProject) -> NovelProject:
     return project
 
 
-def _load_readme_summary() -> str:
-    root = Path(__file__).resolve().parent
-    readme_path = root / "readme.txt"
-    if readme_path.exists():
-        return readme_path.read_text(encoding="utf-8")
-    return "No readme.txt found in the project directory."
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Novel Architect: guided novel-planning assistant")
     parser.add_argument("--title", default="Novel Development Blueprint", help="Title for the novel project")
@@ -229,7 +242,6 @@ def main() -> None:
     print(f"\nProject saved to: {output}")
     print("\n--- Final planning document preview ---\n")
     print(markdown[:2500])
-    print(f"\nRequirements source reviewed: {_load_readme_summary()[:180]}...")
 
 
 if __name__ == "__main__":

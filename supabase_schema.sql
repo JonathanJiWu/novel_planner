@@ -1,3 +1,6 @@
+-- Novel Architect schema for Supabase. Safe to re-run: every statement is idempotent.
+-- Run it in the Supabase SQL editor on first setup and again after upgrading the app.
+
 create table if not exists public.projects (
   owner_id uuid primary key references auth.users(id) on delete cascade,
   title text not null,
@@ -72,3 +75,25 @@ create policy "Users can update their own project"
   on public.projects for update
   using (auth.uid() = owner_id)
   with check (auth.uid() = owner_id);
+
+-- Revision tracking (added in 1.1). The API saves with
+--   PATCH /projects?owner_id=eq.<id>&revision=eq.<revision the browser edited>
+-- so a stale browser tab cannot silently overwrite newer work. Existing rows
+-- start at revision 1; every update increments the revision.
+alter table public.projects add column if not exists revision bigint not null default 1;
+
+create or replace function public.bump_project_revision()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.revision := old.revision + 1;
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists projects_bump_revision on public.projects;
+create trigger projects_bump_revision
+  before update on public.projects
+  for each row execute function public.bump_project_revision();

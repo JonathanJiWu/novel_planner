@@ -1,3 +1,19 @@
 __pycache__/
 *.py[cod]
+.pytest_cache/
 test_output.md
+
+# Local data: never commit accounts, projects, or their backups.
+novel_project.json
+.novel_project.json.*.tmp
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.db.backup-*
+
+# Environment and tooling
+.env
+.venv/
+venv/
+node_modules/

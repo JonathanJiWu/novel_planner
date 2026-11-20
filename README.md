@@ -23,127 +23,127 @@ Every stage includes a purpose, exercise, useful output, completion standard, de
 
 ## Built for the messy beginning
 
-- **Capture ideas quickly** in a categorized idea inbox
-- **Import existing notes** from `.txt` or Markdown files
+- **Capture ideas quickly** in a categorized idea inbox, and re-file them later
+- **Import existing notes** from one or more `.txt` or Markdown files (long files are split into parts)
 - **Keep source material intact** without accidentally turning it into a final decision
 - **Mark every choice** as essential, important, optional, deferred, or intentionally unknown
 - **Track confidence** as needs development, provisional, or settled
-- **Search your project** across planning answers, ideas, and source material
-- **Watch your progress** as key decisions become settled
-- **Export a blueprint** as Markdown or print-ready PDF
-- **Choose a comfortable theme** in dark, light, or warm paper mode
+- **Search your project** across planning answers, ideas, and source material, and jump back to any answer
+- **Watch your progress** as essential decisions become settled (deferring or downgrading a decision removes it from the target)
+- **Export a blueprint** as Markdown or PDF (PDF exports keep Chinese, Japanese, Korean, Cyrillic, and Greek text)
+- **Choose a comfortable theme**: dark, light, or warm paper
+- **Never lose work silently**: autosave with retries, a warning before closing with unsaved changes, and a conflict prompt when the same project was changed in another tab or device
 
-## Try the live website
+## Three ways to run it
+
+| | Where projects are stored | Accounts | Use it for |
+|---|---|---|---|
+| [Live demo](https://jonathanjiwu.github.io/novel_planner/) (GitHub Pages) | This browser only (IndexedDB) | Local profiles in this browser | Trying the planner |
+| `python web_app.py` | `novel_project.json` on your computer | None (single user) | Personal use on your own machine |
+| `uvicorn app:app` | SQLite database, or Supabase | Real accounts | Anything shared or used across devices |
+
+### Live demo (GitHub Pages)
 
 **Live website: [https://jonathanjiwu.github.io/novel_planner/](https://jonathanjiwu.github.io/novel_planner/)**
 
-The public GitHub Pages demo runs in the browser and saves your project locally on the device you are using.
+The demo has no server. "Accounts" there are local profiles: the profile and its project stay in the browser where they were created, are not available on other devices, and are deleted if the site's data is cleared. Export your plan regularly. **Print or save as PDF** opens the browser's print dialog with a print-ready version of the plan.
 
-> Local browser storage is convenient for a personal demo, but it is not a replacement for account-based cloud backup.
+Projects started in the demo before profiles existed are moved into the first profile that signs in on that browser (a backup copy stays in the browser's storage).
 
-To publish the demo:
+Publishing: pushes to `main` run [`deploy.yml`](.github/workflows/deploy.yml), which runs the full test suite, builds the static site, deploys it to GitHub Pages, and smoke-tests the live URL. (Repository **Settings › Pages › Build and deployment** must be set to **GitHub Actions**.)
 
-1. Push the repository to GitHub, or update the existing `main` branch.
-2. Open **Settings > Pages** in the repository.
-3. Under **Build and deployment**, select **GitHub Actions**.
-4. Open the **Actions** tab and run **Test and deploy Novel Architect**.
-
-The workflow at [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs the tests, generates the planning data, and deploys the browser application to GitHub Pages.
-
-## Host a private, account-based beta
-
-For projects that need sign-in and access across devices, Novel Architect includes a FastAPI backend, Supabase authentication, and PostgreSQL-backed project storage.
-
-### Supabase setup
-
-1. Create a Supabase project.
-2. Run [`supabase_schema.sql`](supabase_schema.sql) in the Supabase SQL editor.
-3. Configure Supabase Auth providers and redirect URLs for the deployed website.
-4. Use a real SMTP provider for verification, password reset, and magic-link emails.
-5. In GitHub OAuth provider settings, enable GitHub sign-in and add the deployed website origin.
-6. In Supabase **Authentication > Providers**, enable Google, GitHub, Apple, and Facebook (for Meta).
-7. Add `https://<project-ref>.supabase.co/auth/v1/callback` as the callback URL in each provider.
-8. Set each provider's allowed redirect URL to `PUBLIC_APP_URL`, and add that exact origin under Supabase **Authentication > URL Configuration**.
-
-### Render setup
-
-1. Create a Render Web Service for this repository.
-2. Use [`render.yaml`](render.yaml) as the deployment reference.
-3. Set the environment values described in [`.env.example`](.env.example).
-4. Set `AUTH_REQUIRED=true`.
-5. Set `ALLOWED_ORIGINS` to the live website origin.
-6. Set `SUPABASE_SERVICE_ROLE_KEY` only on the server.
-7. Set `ADMIN_EMAILS` to a comma-separated allowlist of administrator emails.
-8. In GitHub, add `RENDER_DEPLOY_HOOK_URL` as an Actions secret.
-9. Set `AUTH_SECRET` to a long random server-only value.
-10. Set `NOVEL_PLANNER_DB` to a persistent disk path for SQLite accounts and projects.
-
-After setup, [`.github/workflows/deploy-render.yml`](.github/workflows/deploy-render.yml)
-triggers a Render deployment for every push to `main` or manual workflow run.
-
-### Persistent accounts and database administration
-
-- A built-in account system uses password-scrypt hashing and signed bearer sessions when Supabase variables are not configured.
-- Built-in accounts and projects are stored in SQLite at `NOVEL_PLANNER_DB`; attach persistent disk storage to preserve them across Render restarts.
-- Supabase Auth provides email/password, magic-link, OAuth, and GitHub sign-in.
-- Login and Register controls appear in the top-right account area; signed-in users see Sign out.
-- `supabase_schema.sql` creates `public.projects` for per-user saved plans and `public.profiles` for user metadata.
-- Row Level Security ensures ordinary users can only read and write their own project.
-- Administrators listed in `ADMIN_EMAILS` can open **Database admin** in the application and view or delete saved projects.
-- Use the Supabase Dashboard's **Table Editor**, **Authentication**, and **Database** sections for direct administration and backups.
-
-Never place service-role or SMTP credentials in the browser or commit secrets to the repository.
-
-The production entrypoint is [`app.py`](app.py). It verifies Supabase JWTs, assigns project records to authenticated users, and keeps browser configuration limited to the Supabase publishable key.
-
-## Run locally
-
-Install the dependencies:
+### Single-user local server
 
 ```bash
 python -m pip install -r requirements.txt
+python web_app.py            # then open http://127.0.0.1:8000
 ```
 
-Start the browser application:
+The project is saved in `novel_project.json` (use `--project-file PATH` to choose another file). There are no accounts, so keep the server on `127.0.0.1`.
+
+### Account-based server
 
 ```bash
-python web_app.py
+python -m pip install -r requirements.txt
+AUTH_REQUIRED=true python -m uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-Then visit `http://127.0.0.1:8000`.
+With no Supabase settings, accounts and projects are stored in SQLite at `NOVEL_PLANNER_DB` (default `novel_planner.db` in the project folder). See [`.env.example`](.env.example) for every setting.
 
-For a production-mode local test:
+- Passwords are hashed with scrypt; sessions are signed tokens that can be revoked (signing out ends the session on the server).
+- Failed logins and registrations are rate-limited.
+- Every save carries the revision it was based on; a save from an outdated tab is rejected and the writer chooses which version to keep.
+- Schema changes are applied by numbered migrations when the server starts. Before migrating an existing database, the server writes a backup next to it (`<database>.backup-v<old version>-<timestamp>`).
+
+#### Administrators
+
+Addresses listed in `ADMIN_EMAILS` can open **Database admin** to list projects (owner, title, last update) and delete them. With built-in accounts, those addresses cannot be registered from the website. Create them on the server instead:
 
 ```bash
-python -m uvicorn app:app --host 127.0.0.1 --port 8000
+python manage.py create-user you@example.com      # prompts for a password
+python manage.py set-password you@example.com     # reset a password and sign out its sessions
+python manage.py list-users
+python manage.py backup                           # timestamped copy of the database
+python manage.py migrate                          # apply migrations (also happens at startup)
 ```
+
+#### Deploying to Render
+
+[`render.yaml`](render.yaml) describes the service: a persistent disk at `/var/data` for the SQLite database (persistent disks need a paid Render instance), `AUTH_REQUIRED=true`, and a generated `AUTH_SECRET`.
+
+1. Create the service from `render.yaml` (Render **Blueprints**), then set `ADMIN_EMAILS`.
+2. In the Render service, copy the **Deploy Hook** URL and add it to this GitHub repository as the Actions secret `RENDER_DEPLOY_HOOK_URL`.
+3. Optionally add the repository variable `RENDER_SERVICE_URL` (for example `https://novel-architect.onrender.com`).
+4. Open the Render **Shell** and create your administrator account with `python manage.py create-user`.
+
+[`deploy-render.yml`](.github/workflows/deploy-render.yml) then deploys every `main` commit that passed the tests. With `RENDER_SERVICE_URL` set, it waits until `/api/health` reports the new commit before reporting success. Without the secret, the workflow reports that nothing was deployed.
+
+Behind Render's proxy all requests can appear to come from a few addresses, which makes the per-address login limits shared. If you know your proxy's address range, set uvicorn's `FORWARDED_ALLOW_IPS` so real client addresses are used.
+
+#### Using Supabase instead of SQLite
+
+1. Create a Supabase project and run [`supabase_schema.sql`](supabase_schema.sql) in the SQL editor. The script is idempotent: run it again after upgrading Novel Architect (version 1.1 adds the `revision` column and its trigger).
+2. Configure Auth providers and redirect URLs; use a real SMTP provider for confirmation and magic-link emails. Keep **Confirm email** enabled, since administrator access is granted by email address.
+3. For each OAuth provider, add `https://<project-ref>.supabase.co/auth/v1/callback` as the callback URL, and add `PUBLIC_APP_URL` under **Authentication › URL Configuration**.
+4. Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (server only), and `PUBLIC_APP_URL`.
+
+Row Level Security limits each user to their own project; the admin page uses the service-role key on the server. The browser loads the Supabase client library only in this mode (pinned version with a Subresource Integrity hash). Tokens are verified with the project's JWKS (asymmetric signing keys).
+
+Never place service-role keys, `AUTH_SECRET`, or SMTP credentials in the browser or commit them to the repository.
 
 ## Generate a plan from the command line
 
-Create a demo blueprint:
-
 ```bash
-python novel_architect.py --demo --output novel_plan.md
-```
-
-Answer the planning questions interactively:
-
-```bash
+python novel_architect.py --demo --output novel_plan.md          # sample blueprint
 python novel_architect.py --interactive --output my_novel_plan.md
 ```
 
 ## Test
 
 ```bash
-python -m pytest -q
+python -m pip install -r requirements-dev.txt
+python -m pytest -q                 # unit, API, database, export, and server tests
+
+npm ci                              # browser tests (Playwright)
+npx playwright install chromium
+npm test                            # browser-logic unit tests + end-to-end journeys
 ```
+
+The end-to-end suite starts real servers (local, account-based, and the static Pages build) and drives Chromium through the main journeys: autosave and reload, imports, conflicts between tabs, sign-in and sign-out, expired sessions, administration, exports, themes, and the phone layout. Set `PYTHON` if your Python interpreter is not `python3`.
+
+`tests/test_supabase_schema.py` applies the Supabase schema to a real PostgreSQL database when `NOVEL_PLANNER_TEST_POSTGRES_DSN` is set (CI provides one).
 
 ## Project structure
 
-- [`novel_architect.py`](novel_architect.py): planning model and command-line application
-- [`web_app.py`](web_app.py): local browser server and JSON project API
-- [`app.py`](app.py): production FastAPI entrypoint
-- [`auth.py`](auth.py): Supabase JWT verification
-- [`store.py`](store.py): local or Supabase project storage
-- [`web/`](web/): browser interface and static deployment assets
-- [`tests/test_novel_architect.py`](tests/test_novel_architect.py): project and export tests
+- [`novel_architect.py`](novel_architect.py): planning model, question catalog, and command-line application
+- [`planner_content.py`](planner_content.py): stage guides and the question bank
+- [`project_data.py`](project_data.py): the project document format, limits, and validation
+- [`exports.py`](exports.py): Markdown and PDF exports
+- [`web_app.py`](web_app.py): single-user local server
+- [`app.py`](app.py): production API (FastAPI)
+- [`auth.py`](auth.py), [`auth_store.py`](auth_store.py): sessions, built-in accounts, migrations
+- [`store.py`](store.py): project storage (SQLite or Supabase)
+- [`manage.py`](manage.py): operator commands
+- [`web/`](web/): browser application (`app.js`, `planner-logic.js`, `styles.css`) and static data
+- [`fonts/`](fonts/): DejaVu Sans for PDF exports (see `fonts/LICENSE-DejaVu.txt`)
+- [`tests/`](tests/): Python tests; [`tests/js/`](tests/js/) and [`tests/e2e/`](tests/e2e/): browser tests

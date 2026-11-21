@@ -31,14 +31,15 @@ create table if not exists auth.users (
 create or replace function auth.uid() returns uuid language sql stable as
   $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 do $$ begin
-  if not exists (select 1 from pg_roles where rolname = 'authenticated') then
-    create role authenticated;
-  end if;
+  if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
+  if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+  if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin bypassrls; end if;
 end $$;
-grant usage on schema public, auth to authenticated;
-grant execute on function auth.uid() to authenticated;
+grant usage on schema auth to anon, authenticated;
+grant execute on function auth.uid() to anon, authenticated;
 """
-GRANTS = "grant select, insert, update on public.projects, public.profiles to authenticated;"
+# No extra table grants here: like a Supabase project created after May 2026,
+# the API roles can only use what supabase_schema.sql grants them.
 ALICE = "11111111-1111-1111-1111-111111111111"
 BOB = "22222222-2222-2222-2222-222222222222"
 
@@ -67,14 +68,23 @@ def database():
 
 def apply_schema(database: str) -> None:
     psql((PROJECT_ROOT / "supabase_schema.sql").read_text(encoding="utf-8"), database)
-    psql(GRANTS, database)
 
 
-def as_user(user_id: str, sql: str) -> str:
+def as_user(user_id: str, sql: str, role: str = "authenticated") -> str:
     return (
-        "begin; set local role authenticated; "
+        f"begin; set local role {role}; "
         f"select set_config('request.jwt.claim.sub', '{user_id}', true); {sql}; commit;"
     )
+
+
+def run_failing(database: str, sql: str) -> str:
+    result = subprocess.run(
+        ["psql", DSN.rsplit("/", 1)[0] + f"/{database}", "-v", "ON_ERROR_STOP=1", "-c", sql],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0, "expected the statement to be refused"
+    return result.stderr
 
 
 def test_schema_is_idempotent_and_creates_profiles(database):
@@ -125,11 +135,19 @@ def test_row_level_security_keeps_projects_private(database):
     psql(as_user(BOB, f"update public.projects set title = 'Hijacked' where owner_id = '{ALICE}'"), database)
     assert psql(f"select title from public.projects where owner_id = '{ALICE}'", database) == ["Alice private"]
 
-    inserted_for_someone_else = subprocess.run(
-        ["psql", DSN.rsplit("/", 1)[0] + f"/{database}", "-v", "ON_ERROR_STOP=1", "-c",
-         as_user(BOB, f"insert into public.projects (owner_id, title, data) values ('{ALICE}', 'x', '{{}}')")],
-        capture_output=True,
-        text=True,
-    )
-    assert inserted_for_someone_else.returncode != 0
-    assert "row-level security" in inserted_for_someone_else.stderr
+    refused = run_failing(database, as_user(BOB, f"insert into public.projects (owner_id, title, data) values ('{ALICE}', 'x', '{{}}')"))
+    assert "row-level security" in refused
+
+
+def test_signed_in_users_get_only_the_grants_the_app_needs(database):
+    apply_schema(database)
+    psql(f"insert into auth.users (id, email) values ('{ALICE}', 'alice@example.com')", database)
+    # Without the schema's grants, a new Supabase project would refuse these with "permission denied".
+    psql(as_user(ALICE, f"insert into public.projects (owner_id, title, data) values ('{ALICE}', 'Mine', '{{}}')"), database)
+    psql(as_user(ALICE, f"update public.projects set title = 'Still mine' where owner_id = '{ALICE}'"), database)
+    assert psql(as_user(ALICE, "select title from public.projects"), database)[-1] == "Still mine"
+    assert "permission denied" in run_failing(database, as_user(ALICE, "delete from public.projects"))
+    # Visitors who are not signed in cannot read any project.
+    assert "permission denied" in run_failing(database, as_user(ALICE, "select * from public.projects", role="anon"))
+    # The server's service role can list and delete projects for the Database admin page.
+    psql("begin; set local role service_role; select count(*) from public.projects; commit;", database)

@@ -97,3 +97,15 @@ drop trigger if exists projects_bump_revision on public.projects;
 create trigger projects_bump_revision
   before update on public.projects
   for each row execute function public.bump_project_revision();
+
+-- Data API access. Since May 2026 Supabase no longer exposes new tables to the
+-- Data API automatically, so grant exactly what the app uses. Signed-in users
+-- still reach only their own rows through the Row Level Security policies
+-- above; visitors who are not signed in get no table access at all; the
+-- server's service role is used by the Database admin page.
+grant usage on schema public to anon, authenticated, service_role;
+revoke all on public.projects, public.profiles from anon;
+grant select, insert, update on public.projects to authenticated;
+grant select, update on public.profiles to authenticated;
+grant select, insert, update, delete on public.projects to service_role;
+grant select on public.profiles to service_role;
